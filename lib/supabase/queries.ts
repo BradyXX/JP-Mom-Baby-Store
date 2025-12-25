@@ -165,11 +165,12 @@ export async function isAdmin(): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
   
+  // FIXED: Check user_id column instead of id, and use maybeSingle
   const { data } = await supabase
     .from('admin_users')
-    .select('id')
-    .eq('id', user.id)
-    .single();
+    .select('user_id, role')
+    .eq('user_id', user.id)
+    .maybeSingle();
     
   return !!data;
 }

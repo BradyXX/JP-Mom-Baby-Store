@@ -1,6 +1,14 @@
 import { Order } from "@/lib/supabase/types";
 
 /**
+ * 确保 Handle 格式正确 (必须包含 @)
+ */
+function ensureAtPrefix(handle: string | null): string {
+  if (!handle) return '';
+  return handle.startsWith('@') ? handle : `@${handle}`;
+}
+
+/**
  * 完整消息内容：用于复制到剪贴板，包含详细地址和商品清单
  */
 export function formatLineMessage(order: Order): string {
@@ -41,23 +49,24 @@ export function formatShortLineMessage(order: Order): string {
 
 /**
  * 获取 LINE OA 消息链接 (Universal Link)
- * 规则：handle 必须去掉 @，域名禁止使用 www
+ * 格式: https://line.me/R/oaMessage/@{HANDLE}/?{MSG}
  */
 export function getLineUniversalLink(oaHandle: string | null, message: string): string {
   if (!oaHandle) return 'https://line.me';
-  const oaId = oaHandle.replace(/^@/, '');
+  const handle = ensureAtPrefix(oaHandle);
   const encodedMessage = encodeURIComponent(message);
-  return `https://line.me/R/oaMessage/${oaId}/?${encodedMessage}`;
+  return `https://line.me/R/oaMessage/${handle}/?${encodedMessage}`;
 }
 
 /**
  * 获取 LINE App Scheme 链接 (原生唤起优先)
+ * 格式: line://R/oaMessage/@{HANDLE}/?{MSG}
  */
 export function getLineSchemeLink(oaHandle: string | null, message: string): string {
   if (!oaHandle) return 'line://';
-  const oaId = oaHandle.replace(/^@/, '');
+  const handle = ensureAtPrefix(oaHandle);
   const encodedMessage = encodeURIComponent(message);
-  return `line://oaMessage/${oaId}/?${encodedMessage}`;
+  return `line://R/oaMessage/${handle}/?${encodedMessage}`;
 }
 
 /**
@@ -65,6 +74,6 @@ export function getLineSchemeLink(oaHandle: string | null, message: string): str
  */
 export function getLineAddFriendLink(oaHandle: string | null): string {
   if (!oaHandle) return 'https://line.me';
-  const oaId = oaHandle.replace(/^@/, '');
-  return `https://line.me/R/ti/p/@${oaId}`;
+  const handle = ensureAtPrefix(oaHandle);
+  return `https://line.me/R/ti/p/${handle}`;
 }

@@ -1,0 +1,5 @@
+{
+  "name": "JP Mom & Baby Store",
+  "description": "A minimalist, mobile-first Japanese COD e-commerce skeleton using Next.js 14, Supabase, and Tailwind CSS.",
+  "requestFramePermissions": []
+}

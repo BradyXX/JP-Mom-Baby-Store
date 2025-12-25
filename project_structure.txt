@@ -1,0 +1,44 @@
+
+/
+├── app/
+│   ├── admin/
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   └── page.tsx
+│   ├── checkout/
+│   │   └── page.tsx
+│   ├── collections/
+│   │   └── [handle]/
+│   │       └── page.tsx
+│   ├── products/
+│   │   └── [slug]/
+│   │       └── page.tsx
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── drawers/
+│   │   ├── CartDrawer.tsx
+│   │   └── SearchDrawer.tsx
+│   ├── Accordion.tsx
+│   ├── Carousel.tsx
+│   ├── CookieConsent.tsx
+│   ├── Footer.tsx
+│   ├── Header.tsx
+│   ├── Newsletter.tsx
+│   ├── ProductCard.tsx
+│   ├── Tabs.tsx
+│   └── TopBar.tsx
+├── lib/
+│   └── supabase/
+│       ├── client.ts
+│       ├── queries.ts
+│       └── types.ts
+├── store/
+│   ├── useCartStore.ts
+│   └── useUIStore.ts
+├── .env.local.example
+├── package.json
+├── postcss.config.js
+├── tailwind.config.ts
+└── README.md

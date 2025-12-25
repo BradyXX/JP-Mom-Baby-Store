@@ -1,15 +1,15 @@
 import { Order } from "@/lib/supabase/types";
 
 /**
- * 确保 Handle 格式正确 (必须包含 @)
+ * 格式化 Handle：由于数据库已存为 @handle 格式，这里直接返回。
+ * 仅做基础非空检查。
  */
-function ensureAtPrefix(handle: string | null): string {
-  if (!handle) return '';
-  return handle.startsWith('@') ? handle : `@${handle}`;
+function getValidHandle(handle: string | null): string {
+  return handle || '';
 }
 
 /**
- * 完整消息内容：用于复制到剪贴板，包含详细地址和商品清单
+ * 完整消息内容：用于复制到剪贴板
  */
 export function formatLineMessage(order: Order): string {
   const itemsText = order.items.map(item => 
@@ -25,14 +25,14 @@ export function formatLineMessage(order: Order): string {
 商品：
 ${itemsText}
 
-合计：¥${order.total.toLocaleString()}
+合計：¥${order.total.toLocaleString()}
 備考：${order.notes || 'なし'}
 
 ※このメッセージを送信して注文を確定してください。`;
 }
 
 /**
- * 短版消息内容：专门用于移动端 Deep Link，避免 URL 过长导致无法唤起 LINE
+ * 短版消息内容：专门用于移动端 Deep Link，确保 URL 长度在安全范围内
  */
 export function formatShortLineMessage(order: Order): string {
   const firstItem = order.items[0];
@@ -49,31 +49,33 @@ export function formatShortLineMessage(order: Order): string {
 
 /**
  * 获取 LINE OA 消息链接 (Universal Link)
- * 格式: https://line.me/R/oaMessage/@{HANDLE}/?{MSG}
+ * 禁止使用 www.line.me
+ * 格式: https://line.me/R/oaMessage/{HANDLE}/?{ENCODED_MESSAGE}
  */
 export function getLineUniversalLink(oaHandle: string | null, message: string): string {
-  if (!oaHandle) return 'https://line.me';
-  const handle = ensureAtPrefix(oaHandle);
+  const handle = getValidHandle(oaHandle);
+  if (!handle) return 'https://line.me';
   const encodedMessage = encodeURIComponent(message);
   return `https://line.me/R/oaMessage/${handle}/?${encodedMessage}`;
 }
 
 /**
- * 获取 LINE App Scheme 链接 (原生唤起优先)
- * 格式: line://R/oaMessage/@{HANDLE}/?{MSG}
+ * 获取 LINE App Scheme 链接 (原生唤起)
+ * 格式: line://R/oaMessage/{HANDLE}/?{ENCODED_MESSAGE}
  */
 export function getLineSchemeLink(oaHandle: string | null, message: string): string {
-  if (!oaHandle) return 'line://';
-  const handle = ensureAtPrefix(oaHandle);
+  const handle = getValidHandle(oaHandle);
+  if (!handle) return 'line://';
   const encodedMessage = encodeURIComponent(message);
   return `line://R/oaMessage/${handle}/?${encodedMessage}`;
 }
 
 /**
- * 获取 LINE 加好友链接
+ * 获取 LINE 加好友链接 (兜底方案)
+ * 格式: https://line.me/R/ti/p/{HANDLE}
  */
 export function getLineAddFriendLink(oaHandle: string | null): string {
-  if (!oaHandle) return 'https://line.me';
-  const handle = ensureAtPrefix(oaHandle);
+  const handle = getValidHandle(oaHandle);
+  if (!handle) return 'https://line.me';
   return `https://line.me/R/ti/p/${handle}`;
 }

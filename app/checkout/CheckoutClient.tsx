@@ -42,16 +42,13 @@ export default function CheckoutClient() {
     addressLine1: '', addressLine2: '', phone: '', notes: ''
   });
 
-  const [appliedCoupon] = useState<Coupon | null>(null);
-  
   useEffect(() => {
     getSettings().then(setSettings);
   }, []);
 
   const subtotal = getCartTotal();
-  const discountTotal = appliedCoupon ? calculateDiscountAmount(appliedCoupon, items, subtotal) : 0;
   const shippingFee = settings ? (subtotal >= settings.free_shipping_threshold ? 0 : 600) : 0;
-  const total = Math.max(0, subtotal - discountTotal + shippingFee);
+  const total = subtotal + shippingFee;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,17 +96,12 @@ export default function CheckoutClient() {
           productId: item.productId
         })),
         subtotal: Number(subtotal), 
-        discount_total: Number(discountTotal), 
+        discount_total: 0, 
         shipping_fee: Number(shippingFee),
         total: Number(total),
-        coupon_code: null,
         payment_method: 'COD', 
-        payment_status: 'pending', 
         status: 'new',
-        target_channel: "line",
-        target_line: oaHandle || "",
         line_oa_handle: oaHandle || "",
-        line_confirmed: false,
         utm: getUtmParams(searchParams) || {},
       };
 
@@ -125,11 +117,14 @@ export default function CheckoutClient() {
       sessionStorage.setItem('last_order', JSON.stringify(orderPayload));
       clearCart();
 
-      // Attempt Redirection
+      // Step 1: Try App Scheme
       window.location.href = schemeUrl;
 
+      // Step 2: Fallback to Universal Link if no jump after 500ms
       setTimeout(() => {
         window.location.href = universalUrl;
+        
+        // Step 3: If still in browser after another 800ms, show manual modal
         setTimeout(() => {
           setShowRedirectModal(true);
           setIsSubmitting(false);
@@ -144,7 +139,7 @@ export default function CheckoutClient() {
 
   return (
     <div className="container-base py-8 md:py-12 max-w-4xl">
-      <h1 className="text-2xl font-bold mb-8 text-center md:text-left">ご購入手続き</h1>
+      <h1 className="text-2xl font-bold mb-8">ご購入手続き</h1>
       <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-12">
         <div className="space-y-6">
           <section className="bg-white p-6 border rounded-xl shadow-sm">
@@ -176,7 +171,7 @@ export default function CheckoutClient() {
           </section>
         </div>
 
-        <div className="bg-gray-50 p-6 rounded-xl h-fit sticky top-24 border">
+        <div className="bg-gray-50 p-6 rounded-xl h-fit border">
           <h2 className="font-bold mb-6 border-b pb-2">注文内容</h2>
           <div className="space-y-3 mb-6">
              <div className="flex justify-between text-sm">
@@ -196,7 +191,7 @@ export default function CheckoutClient() {
           <button 
             type="submit" 
             disabled={isSubmitting}
-            className="btn-primary w-full py-4 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all"
+            className="btn-primary w-full py-4 flex items-center justify-center gap-2 shadow-lg"
           >
             {isSubmitting ? <Loader2 className="animate-spin" /> : <MessageCircle size={20} />}
             LINEで注文を確定する
@@ -206,20 +201,20 @@ export default function CheckoutClient() {
 
       {showRedirectModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-white p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl animate-in zoom-in duration-200">
+          <div className="bg-white p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
                <MessageCircle size={32} className="text-green-600" />
              </div>
-             <h3 className="text-xl font-bold mb-2">LINEで注文メッセージを送信</h3>
-             <p className="text-sm text-gray-500 mb-8 leading-relaxed">
-               自動でLINEが開かない場合は、下のボタンを押してメッセージを送信してください。
+             <h3 className="text-xl font-bold mb-2">LINEを開いています...</h3>
+             <p className="text-sm text-gray-500 mb-8">
+               自動でLINEが開かない場合は、下のボタンを押してください。
              </p>
              <div className="space-y-3">
-               <a href={pendingLinks.universal} className="btn-primary w-full bg-[#06C755] hover:bg-[#05b64e] border-none py-4 flex items-center justify-center gap-2 text-lg">
+               <a href={pendingLinks.universal} className="btn-primary w-full bg-[#06C755] border-none py-4 flex items-center justify-center gap-2 text-lg">
                  <MessageCircle size={24} />
                  LINEを開く
                </a>
-               <a href={pendingLinks.addFriend} target="_blank" className="flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-primary py-2">
+               <a href={pendingLinks.addFriend} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-gray-600 py-2">
                  <ExternalLink size={16} />
                  公式LINEを登録して連絡
                </a>

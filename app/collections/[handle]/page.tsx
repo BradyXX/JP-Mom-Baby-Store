@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { listProductsByCollection, ProductListOptions } from "@/lib/supabase/queries";
@@ -35,9 +36,6 @@ interface PageProps {
 export default async function CollectionPage({ params, searchParams }: PageProps) {
   const { handle } = params;
   
-  // Validate basic handle existence (optional, or just show empty)
-  // if (!COLLECTION_TITLES[handle]) return notFound();
-
   const title = COLLECTION_TITLES[handle] || handle.replace(/-/g, ' ');
 
   // Parse Query Params
@@ -54,8 +52,8 @@ export default async function CollectionPage({ params, searchParams }: PageProps
 
   const products = await listProductsByCollection(handle, options);
 
-  // Aggregate popular tags from the current product list (simple implementation)
-  const allTags = products.flatMap(p => p.tags || []);
+  // Aggregate popular tags from the current product list
+  const allTags = products.flatMap(p => p.tags || []) as string[];
   const uniqueTags = Array.from(new Set(allTags)).slice(0, 12); // Top 12 tags
 
   return (
@@ -95,9 +93,9 @@ export default async function CollectionPage({ params, searchParams }: PageProps
                 前のページ
             </Link>
         )}
-        {products.length === options.pageSize && (
+        {products.length === (options.pageSize || 20) && (
              <Link 
-                href={`?page=${options.page! + 1}`}
+                href={`?page=${(options.page || 1) + 1}`}
                 className="btn-secondary py-2 px-4 text-xs"
             >
                 次のページ

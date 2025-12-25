@@ -1,5 +1,6 @@
+
 'use client';
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 

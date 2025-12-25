@@ -99,7 +99,8 @@ export default function CollectionFilters({ availableTags }: CollectionFiltersPr
                     type="checkbox" 
                     className="hidden"
                     checked={currentInStock}
-                    onChange={(e) => applyFilters({ inStock: e.target.checked ? 'true' : null })}
+                    // Fixed: Added HTMLInputElement cast to access checked
+                    onChange={(e) => applyFilters({ inStock: (e.target as HTMLInputElement).checked ? 'true' : null })}
                 />
                 <span className="text-sm">在庫ありのみ表示</span>
              </label>
@@ -114,7 +115,8 @@ export default function CollectionFilters({ availableTags }: CollectionFiltersPr
                     placeholder="Min" 
                     className="w-24 p-2 text-sm border border-gray-300 rounded"
                     value={minPrice}
-                    onChange={(e) => applyFilters({ minPrice: e.target.value })}
+                    // Fixed: Added HTMLInputElement cast to access value
+                    onChange={(e) => applyFilters({ minPrice: (e.target as HTMLInputElement).value })}
                 />
                 <span className="text-gray-400">~</span>
                 <input 
@@ -122,7 +124,8 @@ export default function CollectionFilters({ availableTags }: CollectionFiltersPr
                     placeholder="Max" 
                     className="w-24 p-2 text-sm border border-gray-300 rounded"
                     value={maxPrice}
-                    onChange={(e) => applyFilters({ maxPrice: e.target.value })}
+                    // Fixed: Added HTMLInputElement cast to access value
+                    onChange={(e) => applyFilters({ maxPrice: (e.target as HTMLInputElement).value })}
                 />
             </div>
           </div>

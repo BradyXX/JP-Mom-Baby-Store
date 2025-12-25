@@ -15,7 +15,7 @@ export default function AdminOrdersPage() {
     setLoading(true);
     try {
       const { data } = await adminListOrders(page, 50, statusFilter || undefined);
-      setOrders(data);
+      setOrders(data || []);
     } catch (e) {
       alert('Failed to load orders');
     } finally {
@@ -39,7 +39,8 @@ export default function AdminOrdersPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">注文管理</h1>
-        <select className="input-base w-auto" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+        {/* Fixed: Added HTMLSelectElement cast to access value */}
+        <select className="input-base w-auto" value={statusFilter} onChange={e => setStatusFilter((e.target as HTMLSelectElement).value)}>
           <option value="">全ステータス</option>
           <option value="new">新規</option>
           <option value="processing">処理中</option>

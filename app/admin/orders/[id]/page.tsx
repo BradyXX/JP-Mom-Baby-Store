@@ -57,7 +57,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               <select 
                 className="input-base" 
                 value={order.status} 
-                onChange={e => updateOrder({ status: e.target.value as any })}
+                // Fixed: Added HTMLSelectElement cast to access value
+                onChange={e => updateOrder({ status: (e.target as HTMLSelectElement).value as any })}
               >
                 <option value="new">新規受付 (new)</option>
                 <option value="processing">処理中 (processing)</option>
@@ -71,7 +72,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               <select 
                 className="input-base" 
                 value={order.payment_status} 
-                onChange={e => updateOrder({ payment_status: e.target.value as any })}
+                // Fixed: Added HTMLSelectElement cast to access value
+                onChange={e => updateOrder({ payment_status: (e.target as HTMLSelectElement).value as any })}
               >
                 <option value="pending">未払い (pending)</option>
                 <option value="paid">支払い済み (paid)</option>
@@ -83,7 +85,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <input 
                         type="checkbox" 
                         checked={order.line_confirmed} 
-                        onChange={e => updateOrder({ line_confirmed: e.target.checked })}
+                        // Fixed: Added HTMLInputElement cast to access checked
+                        onChange={e => updateOrder({ line_confirmed: (e.target as HTMLInputElement).checked })}
                         className="w-5 h-5 accent-green-500"
                     />
                     <span className="font-medium text-sm">LINE連携確認済み (Line Confirmed)</span>

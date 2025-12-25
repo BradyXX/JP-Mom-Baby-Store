@@ -64,7 +64,8 @@ export default function SearchDrawer() {
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              // Fixed: Added HTMLInputElement cast to access value
+              onChange={(e) => setQuery((e.target as HTMLInputElement).value)}
               placeholder="何をお探しですか？"
               className="w-full pl-10 pr-4 py-3 border-b-2 border-gray-200 focus:border-gray-800 outline-none text-lg placeholder:text-gray-300 bg-transparent"
               autoFocus

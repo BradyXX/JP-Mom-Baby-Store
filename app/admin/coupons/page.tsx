@@ -60,16 +60,19 @@ export default function AdminCouponsPage() {
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <label className="text-xs font-bold block mb-1">コード</label>
-                  <input className="input-base" value={editing.code} onChange={e => setEditing({...editing, code: e.target.value.toUpperCase()})} />
+                  {/* Fixed: Added HTMLInputElement cast to access value */}
+                  <input className="input-base" value={editing.code} onChange={e => setEditing({...editing, code: (e.target as HTMLInputElement).value.toUpperCase()})} />
                </div>
                <div>
                   <label className="text-xs font-bold block mb-1">割引率 (%)</label>
-                  <input type="number" className="input-base" value={editing.discount_percentage} onChange={e => setEditing({...editing, discount_percentage: Number(e.target.value)})} />
+                  {/* Fixed: Added HTMLInputElement cast to access value */}
+                  <input type="number" className="input-base" value={editing.discount_percentage} onChange={e => setEditing({...editing, discount_percentage: Number((e.target as HTMLInputElement).value)})} />
                </div>
             </div>
             <div>
               <label className="text-xs font-bold block mb-1">スコープ</label>
-              <select className="input-base" value={editing.scope} onChange={e => setEditing({...editing, scope: e.target.value as any})}>
+              {/* Fixed: Added HTMLSelectElement cast to access value */}
+              <select className="input-base" value={editing.scope} onChange={e => setEditing({...editing, scope: (e.target as HTMLSelectElement).value as any})}>
                 <option value="global">全体 (Global)</option>
                 <option value="product">特定商品 (Product)</option>
                 <option value="collection">特定コレクション (Collection)</option>
@@ -78,23 +81,27 @@ export default function AdminCouponsPage() {
             {editing.scope === 'product' && (
                <div>
                   <label className="text-xs font-bold block mb-1">商品ID (カンマ区切り)</label>
-                  <input className="input-base" placeholder="1, 2, 3" value={editing.applies_to_product_ids?.join(', ')} onChange={e => setEditing({...editing, applies_to_product_ids: e.target.value.split(',').map(s=>Number(s.trim())).filter(n=>!isNaN(n))})} />
+                  {/* Fixed: Added HTMLInputElement cast to access value */}
+                  <input className="input-base" placeholder="1, 2, 3" value={editing.applies_to_product_ids?.join(', ')} onChange={e => setEditing({...editing, applies_to_product_ids: (e.target as HTMLInputElement).value.split(',').map(s=>Number(s.trim())).filter(n=>!isNaN(n))})} />
                </div>
             )}
             {editing.scope === 'collection' && (
                <div>
                   <label className="text-xs font-bold block mb-1">Collection Handles (カンマ区切り)</label>
-                  <input className="input-base" placeholder="best-sellers, toys" value={editing.applies_to_collection_handles?.join(', ')} onChange={e => setEditing({...editing, applies_to_collection_handles: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} />
+                  {/* Fixed: Added HTMLInputElement cast to access value */}
+                  <input className="input-base" placeholder="best-sellers, toys" value={editing.applies_to_collection_handles?.join(', ')} onChange={e => setEditing({...editing, applies_to_collection_handles: (e.target as HTMLInputElement).value.split(',').map(s=>s.trim()).filter(Boolean)})} />
                </div>
             )}
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <label className="text-xs font-bold block mb-1">最低購入金額</label>
-                  <input type="number" className="input-base" value={editing.min_order_amount} onChange={e => setEditing({...editing, min_order_amount: Number(e.target.value)})} />
+                  {/* Fixed: Added HTMLInputElement cast to access value */}
+                  <input type="number" className="input-base" value={editing.min_order_amount} onChange={e => setEditing({...editing, min_order_amount: Number((e.target as HTMLInputElement).value)})} />
                </div>
                <div className="flex items-center mt-5">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={editing.active} onChange={e => setEditing({...editing, active: e.target.checked})} className="w-5 h-5 accent-primary" />
+                    {/* Fixed: Added HTMLInputElement cast to access checked */}
+                    <input type="checkbox" checked={editing.active} onChange={e => setEditing({...editing, active: (e.target as HTMLInputElement).checked})} className="w-5 h-5 accent-primary" />
                     <span>有効にする</span>
                   </label>
                </div>

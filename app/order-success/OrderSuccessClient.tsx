@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, MessageCircle, Copy, ArrowRight, ExternalLink, AlertTriangle, Check } from 'lucide-react';
+import { CheckCircle2, MessageCircle, Copy, ArrowRight, ExternalLink, AlertTriangle, Check, X } from 'lucide-react';
 import { Order } from '@/lib/supabase/types';
 import { 
   formatLineMessage, 
   formatShortLineMessage, 
-  getLineDeepLink, 
+  getLineUniversalLink, 
+  getLineSchemeLink,
   getLineAddFriendLink 
 } from '@/lib/utils/line';
 import Link from 'next/link';
@@ -23,45 +24,57 @@ export default function OrderSuccessClient() {
   const orderNo = searchParams.get('order_no');
   const [order, setOrder] = useState<Order | null>(null);
   const [copied, setCopied] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [showFallbackModal, setShowFallbackModal] = useState(false);
 
   useEffect(() => {
-    // 检测是否为移动端
-    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
-    
     const stored = sessionStorage.getItem('last_order');
     if (stored) {
       const parsed = JSON.parse(stored) as Order;
       if (parsed.order_no === orderNo) {
         setOrder(parsed);
-        // Debug 信息，仅在控制台显示
-        console.log('Order Success Initialized:', {
-          order_no: parsed.order_no,
-          handle: parsed.line_oa_handle,
-          items_count: parsed.items.length
-        });
       }
     }
   }, [orderNo]);
 
-  // 计算不同版本的链接和内容
   const lineData = useMemo(() => {
     if (!order) return null;
     
     const fullMsg = formatLineMessage(order);
     const shortMsg = formatShortLineMessage(order);
-    
-    // 手机端强制使用短消息以保证 DeepLink 稳定，PC端使用短消息或完整消息均可，这里统一使用短消息提升兼容性
-    const deepLink = getLineDeepLink(order.line_oa_handle, shortMsg);
+    const schemeLink = getLineSchemeLink(order.line_oa_handle, shortMsg);
+    const universalLink = getLineUniversalLink(order.line_oa_handle, shortMsg);
     const addFriendLink = getLineAddFriendLink(order.line_oa_handle);
 
-    return { fullMsg, shortMsg, deepLink, addFriendLink };
+    return { fullMsg, shortMsg, schemeLink, universalLink, addFriendLink };
   }, [order]);
 
-  // Fix: Added HTMLButtonElement type argument to React.MouseEvent to resolve the "Generic type 'TargetedMouseEvent' requires 1 type argument(s)" error.
-  const handleCopy = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // Fix: Added HTMLButtonElement generic type to React.MouseEvent to resolve TargetedMouseEvent requirement
+  const handleOpenLine = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!lineData) return;
+    
+    // Attempt robust redirection logic
+    const start = Date.now();
+    window.location.href = lineData.schemeLink;
+
+    setTimeout(() => {
+      // If after 500ms we're still here, try Universal Link
+      window.location.href = lineData.universalLink;
+
+      setTimeout(() => {
+        // If after another 800ms we're still here, show manual fallback modal
+        if (Date.now() - start < 2500) {
+          setShowFallbackModal(true);
+        }
+      }, 800);
+    }, 500);
+  };
+
+  // Fix: Added HTMLButtonElement generic type to React.MouseEvent to resolve TargetedMouseEvent requirement
+  const handleCopy = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!lineData) return;
     navigator.clipboard.writeText(lineData.fullMsg);
     setCopied(true);
@@ -79,7 +92,7 @@ export default function OrderSuccessClient() {
 
   return (
     <div className="container-base py-8 md:py-20 flex flex-col items-center px-4 max-w-2xl mx-auto">
-      {/* 状态图标 */}
+      {/* Status Icon */}
       <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center text-green-500 mb-6 animate-in zoom-in duration-500">
         <CheckCircle2 size={44} strokeWidth={2.5} />
       </div>
@@ -89,9 +102,8 @@ export default function OrderSuccessClient() {
         注文番号: <span className="font-mono font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">{orderNo}</span>
       </p>
 
-      {/* 核心操作卡片 */}
+      {/* Core Action Card */}
       <div className="w-full bg-white border border-gray-100 p-6 md:p-10 rounded-[2.5rem] mb-10 shadow-[0_20px_50px_rgba(0,0,0,0.05)] relative overflow-hidden">
-        {/* 顶部指示条 */}
         <div className="absolute top-0 left-0 w-full h-1.5 bg-[#06C755]"></div>
         
         <div className="flex flex-col items-center">
@@ -105,21 +117,18 @@ export default function OrderSuccessClient() {
             <b>LINEで注文メッセージを送信</b>してください。
           </p>
           
-          {/* 独立按钮组 - 不允许父级 Link */}
           <div className="w-full space-y-4">
-            {/* 1. LINE Deep Link 按钮 - 使用 <a> 标签以保证 hover 显示 URL */}
-            <a 
-              href={lineData.deepLink}
+            <button 
+              onClick={handleOpenLine}
               className="flex items-center justify-center gap-3 w-full bg-[#06C755] text-white py-4 md:py-5 rounded-2xl font-bold text-lg md:text-xl shadow-lg hover:shadow-[#06C755]/30 hover:scale-[1.02] active:scale-95 transition-all"
             >
               <MessageCircle size={24} fill="white" />
               LINEでメッセージを送る
-            </a>
+            </button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* 2. 复制按钮 */}
               <button 
-                onClick={handleCopy}
+                onClick={(e) => handleCopy(e)}
                 className={cn(
                   "flex items-center justify-center gap-2 py-4 px-4 rounded-xl text-sm font-bold transition-all border",
                   copied 
@@ -131,7 +140,6 @@ export default function OrderSuccessClient() {
                 {copied ? 'コピー完了' : '注文情報をコピー'}
               </button>
 
-              {/* 3. OA 链接按钮 */}
               <a 
                 href={lineData.addFriendLink}
                 target="_blank"
@@ -144,14 +152,9 @@ export default function OrderSuccessClient() {
             </div>
           </div>
         </div>
-
-        {/* 调试信息 (仅对开发人员可见，通过 console 或隐藏 div) */}
-        <div className="hidden">
-           <p>DeepLink Length: {lineData.deepLink.length}</p>
-        </div>
       </div>
 
-      {/* 底部导航 */}
+      {/* Footer Nav */}
       <div className="flex flex-col items-center gap-6">
         <Link 
           href="/" 
@@ -165,6 +168,66 @@ export default function OrderSuccessClient() {
           ※LINEが起動しない場合は、「注文情報をコピー」してから公式LINEに貼り付けて送信してください。
         </p>
       </div>
+
+      {/* Manual Fallback Modal */}
+      {showFallbackModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in duration-200">
+            <button 
+              onClick={() => setShowFallbackModal(false)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:bg-gray-100 rounded-full"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-500">
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="text-xl font-bold mb-2">LINEを起動できませんでした</h3>
+              <p className="text-sm text-gray-500">
+                お使いの端末でLINE Appを直接開くことができませんでした。以下の手順で注文を完了してください。
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-2xl">
+                <p className="text-xs font-bold text-gray-400 uppercase mb-2">手順 1</p>
+                <button 
+                  onClick={() => handleCopy()}
+                  className={cn(
+                    "w-full py-3 px-4 rounded-xl flex items-center justify-between font-bold text-sm transition-all",
+                    copied ? "bg-green-500 text-white" : "bg-white border border-gray-200 text-gray-700"
+                  )}
+                >
+                  注文メッセージをコピー
+                  {copied ? <Check size={18} /> : <Copy size={18} />}
+                </button>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-2xl">
+                <p className="text-xs font-bold text-gray-400 uppercase mb-2">手順 2</p>
+                <a 
+                  href={lineData.addFriendLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between font-bold text-sm text-gray-700"
+                >
+                  公式LINEを開いて貼り付け
+                  <ExternalLink size={18} />
+                </a>
+              </div>
+              
+              <button 
+                onClick={() => setShowFallbackModal(false)}
+                className="w-full py-3 text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

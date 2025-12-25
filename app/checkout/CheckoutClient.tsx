@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,11 +9,11 @@ import { supabase } from '@/lib/supabase/client';
 import { Coupon, AppSettings } from '@/lib/supabase/types';
 import { calculateDiscountAmount } from '@/lib/utils/coupons';
 import { getUtmParams } from '@/lib/utils/utm';
-import { formatLineMessage, getLineDeepLink } from '@/lib/utils/line';
+import { formatLineMessage, formatShortLineMessage, getLineUniversalLink, getLineSchemeLink } from '@/lib/utils/line';
 
 const PREFECTURES = [
   "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
-  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+  "茨城県", "栃木県", "群马県", "埼玉県", "千葉県", "東京都", "神奈川県",
   "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
   "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
   "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
@@ -111,29 +110,41 @@ export default function CheckoutClient() {
         notify_status: 'pending'
       };
 
-      const { data, error: sbError } = await supabase
+      const { error: insertError } = await supabase
         .from('orders')
-        .insert(orderPayload)
-        .select()
-        .single();
+        .insert(orderPayload);
 
-      if (sbError) {
-        throw new Error(`[Error ${sbError.code}] ${sbError.message}`);
+      if (insertError) {
+        if (insertError.code === '42501') {
+          throw new Error("注文の送信権限がありません。Supabaseで 'orders' 表の RLS Policy (INSERT) を設定してください。");
+        }
+        throw new Error(`[Order Error] ${insertError.message}`);
       }
 
-      const lineMsg = formatLineMessage(orderPayload);
-      const lineLink = getLineDeepLink(oaHandle, lineMsg);
+      // Prepare LINE Redirection
+      const shortMsg = formatShortLineMessage(orderPayload);
+      const schemeUrl = getLineSchemeLink(oaHandle, shortMsg);
+      const universalUrl = getLineUniversalLink(oaHandle, shortMsg);
 
       sessionStorage.setItem('last_order', JSON.stringify(orderPayload));
       clearCart();
 
-      setPendingLineUrl(lineLink);
-      window.location.href = lineLink;
+      // Attempt robust redirection
+      setPendingLineUrl(universalUrl);
       
+      // Step 1: Try App Scheme
+      window.location.href = schemeUrl;
+
+      // Step 2: Fallback to Universal Link if still on page
       setTimeout(() => {
-        setShowRedirectModal(true);
-        setIsSubmitting(false);
-      }, 1500);
+        window.location.href = universalUrl;
+        
+        // Step 3: If still here, show modal with manual instructions
+        setTimeout(() => {
+          setShowRedirectModal(true);
+          setIsSubmitting(false);
+        }, 1000);
+      }, 500);
 
     } catch (err: any) {
       console.error('Submit error:', err);
@@ -154,7 +165,7 @@ export default function CheckoutClient() {
                  <AlertCircle size={18} className="mt-0.5 shrink-0" />
                  <div className="text-sm">
                    <p className="font-bold">エラーが発生しました</p>
-                   <p className="break-words">{error}</p>
+                   <p className="break-all whitespace-pre-wrap">{error}</p>
                  </div>
                </div>
              )}
@@ -166,7 +177,6 @@ export default function CheckoutClient() {
                 <input placeholder="電話番号" className="input-base" required type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                 <input placeholder="郵便番号" className="input-base" required value={formData.postalCode} onChange={e => setFormData({...formData, postalCode: e.target.value})} />
                 
-                {/* Prefecture Select - Fixed to Japan 47 Prefectures */}
                 <select 
                   className="input-base appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat pr-10" 
                   required 
@@ -205,7 +215,7 @@ export default function CheckoutClient() {
                <span>{shippingFee === 0 ? '無料' : `¥${shippingFee.toLocaleString()}`}</span>
              </div>
              <div className="flex justify-between font-bold text-lg border-t pt-3 mt-3">
-               <span>合計 (税込)</span>
+               <span>合计 (税込)</span>
                <span className="text-primary">¥{total.toLocaleString()}</span>
              </div>
           </div>
@@ -229,7 +239,7 @@ export default function CheckoutClient() {
              </div>
              <h3 className="text-xl font-bold mb-4">LINEで注文を完了</h3>
              <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-               注文情報を保存しました。配送手配を進めるため、LINEでメッセージを送信してください。
+               自動でLINEが開かない場合は、下のボタンを押してください。
              </p>
              <a href={pendingLineUrl} className="btn-primary w-full bg-[#06C755] hover:bg-[#05b64e] border-none mb-4 py-4 flex items-center justify-center gap-2 text-lg">
                <MessageCircle size={24} />

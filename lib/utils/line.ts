@@ -1,4 +1,3 @@
-
 import { Order } from "@/lib/supabase/types";
 
 /**
@@ -18,7 +17,7 @@ export function formatLineMessage(order: Order): string {
 商品：
 ${itemsText}
 
-合計：¥${order.total.toLocaleString()}
+合计：¥${order.total.toLocaleString()}
 備考：${order.notes || 'なし'}
 
 ※このメッセージを送信して注文を確定してください。`;
@@ -41,16 +40,24 @@ export function formatShortLineMessage(order: Order): string {
 }
 
 /**
- * 获取 LINE OA 消息链接
- * 规则：handle 必须去掉 @，消息必须进行双重编码（部分环境下）
+ * 获取 LINE OA 消息链接 (Universal Link)
+ * 规则：handle 必须去掉 @，域名禁止使用 www
  */
-export function getLineDeepLink(oaHandle: string | null, message: string): string {
+export function getLineUniversalLink(oaHandle: string | null, message: string): string {
   if (!oaHandle) return 'https://line.me';
-  // 去掉 @ 符号
-  const oaId = oaHandle.startsWith('@') ? oaHandle.substring(1) : oaHandle;
+  const oaId = oaHandle.replace(/^@/, '');
   const encodedMessage = encodeURIComponent(message);
-  // 使用官方推荐的 oaMessage 格式
   return `https://line.me/R/oaMessage/${oaId}/?${encodedMessage}`;
+}
+
+/**
+ * 获取 LINE App Scheme 链接 (原生唤起优先)
+ */
+export function getLineSchemeLink(oaHandle: string | null, message: string): string {
+  if (!oaHandle) return 'line://';
+  const oaId = oaHandle.replace(/^@/, '');
+  const encodedMessage = encodeURIComponent(message);
+  return `line://oaMessage/${oaId}/?${encodedMessage}`;
 }
 
 /**
@@ -58,6 +65,6 @@ export function getLineDeepLink(oaHandle: string | null, message: string): strin
  */
 export function getLineAddFriendLink(oaHandle: string | null): string {
   if (!oaHandle) return 'https://line.me';
-  const oaId = oaHandle.startsWith('@') ? oaHandle.substring(1) : oaHandle;
+  const oaId = oaHandle.replace(/^@/, '');
   return `https://line.me/R/ti/p/@${oaId}`;
 }

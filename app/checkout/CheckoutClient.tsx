@@ -11,6 +11,7 @@ import { getUtmParams } from '@/lib/utils/utm';
 import { 
   formatShortLineMessage, 
   getLineOrderLink,
+  getActiveLineOA, // 新增导入
   normalizeHandle 
 } from '@/lib/utils/line';
 
@@ -24,7 +25,10 @@ export default function CheckoutClient() {
   const [error, setError] = useState<string | null>(null);
   const [orderSaved, setOrderSaved] = useState(false);
   const [orderNo, setOrderNo] = useState('');
+  
+  // 这里保存最终选定的 Handle
   const [oaHandle, setOaHandle] = useState('');
+  
   const [settings, setSettings] = useState<AppSettings | null>(null);
 
   const [formData, setFormData] = useState({
@@ -47,16 +51,22 @@ export default function CheckoutClient() {
     setError(null);
 
     try {
+      // 1. 获取最新设置（确保 OA 列表是最新的）
       const currentSettings = await getSettings();
-      let selectedOa = '';
-      const enabledOAs = (currentSettings.line_oas as any[] || []).filter(oa => oa.enabled && oa.handle);
-      if (enabledOAs.length > 0) {
-        const idx = parseInt(localStorage.getItem('line_rr_idx') || '0', 10);
-        selectedOa = enabledOAs[idx % enabledOAs.length].handle;
-        localStorage.setItem('line_rr_idx', (idx + 1).toString());
-      }
-      const finalHandle = normalizeHandle(selectedOa);
+      
+      // 2. 【关键修改】使用确定性函数选择 OA
+      // 这里的 logic 对应 lib/line.ts 中的 getActiveLineOA (First Available)
+      // 如果没有可用的，会返回 null
+      const rawHandle = getActiveLineOA(currentSettings.line_oas as any[]);
+      
+      // 3. 规范化 Handle (确保有 @)
+      const finalHandle = normalizeHandle(rawHandle);
       setOaHandle(finalHandle);
+
+      if (!finalHandle && currentSettings.line_enabled) {
+        console.warn("No active LINE OA found, but LINE is enabled.");
+        // 不阻断下单，但可能会导致后续跳转到 LINE 主页
+      }
 
       const newOrderNo = `ORD-${Date.now().toString().slice(-8)}`;
       setOrderNo(newOrderNo);
@@ -77,7 +87,7 @@ export default function CheckoutClient() {
         total,
         payment_method: 'COD',
         status: 'new',
-        line_oa_handle: finalHandle,
+        line_oa_handle: finalHandle, // 保存选定的 Handle 到数据库
         utm: getUtmParams(searchParams)
       };
 
@@ -86,7 +96,7 @@ export default function CheckoutClient() {
 
       sessionStorage.setItem('last_order', JSON.stringify(payload));
       clearCart();
-      setOrderSaved(true); // 显示引导跳转的 Modal
+      setOrderSaved(true);
       setIsSubmitting(false);
     } catch (err: any) {
       setError(err.message);
@@ -94,19 +104,17 @@ export default function CheckoutClient() {
     }
   };
 
-  /**
-   * 同步点击事件，直接设置 window.location.href
-   * 不包含 await，确保移动端浏览器不会拦截跳转
-   */
   const handleLineJump = () => {
     const orderData = JSON.parse(sessionStorage.getItem('last_order') || '{}');
     const msg = formatShortLineMessage(orderData);
+    
+    // 使用已保存的 oaHandle 生成链接
+    // 此时 oaHandle 已经是规范化后的 @handle
     const lineUrl = getLineOrderLink(oaHandle, msg);
     
-    // 直接跳转
+    // Universal Link 直接跳转
     window.location.href = lineUrl;
     
-    // 1秒后在浏览器后台跳转到成功页
     setTimeout(() => {
       router.push(`/order-success?order_no=${orderNo}`);
     }, 1000);

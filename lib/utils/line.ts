@@ -1,16 +1,45 @@
 import { Order } from "@/lib/supabase/types";
 
+// 定义 OA 结构接口
+export interface LineOA {
+  name: string;
+  handle: string;
+  enabled: boolean;
+}
+
 /**
- * 规范化 Handle：确保 handle 永远以 @ 开头
+ * 1. 规范化 Handle
+ * 逻辑：去除空格，确保 @ 前缀
+ * 输入： " 586jucbg " -> "@586jucbg"
  */
 export function normalizeHandle(handle: string | null): string {
   if (!handle) return "";
   const trimmed = handle.trim();
-  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+  // 移除可能存在的 line.me 前缀或其他杂质，只保留 ID 部分
+  const cleanId = trimmed.replace(/^(https?:\/\/)?(line\.me\/R\/ti\/p\/|@)?/, "");
+  return `@${cleanId}`;
 }
 
 /**
- * 完整消息内容：用于手动复制 / 桌面端
+ * 2. 核心：OA 选择逻辑
+ * 策略：【First Available】(取第一个启用的账号)
+ * 原因：这是最稳定、可控的策略。避免客户端轮询造成的不确定性。
+ */
+export function getActiveLineOA(lineOas: any[] | null): string | null {
+  if (!Array.isArray(lineOas)) return null;
+
+  // 1. 过滤出所有 enabled: true 且有 handle 的账号
+  const available = lineOas.filter((oa: LineOA) => oa.enabled && oa.handle);
+
+  if (available.length === 0) return null;
+
+  // 2. 直接返回第一个可用的 handle (Deterministic)
+  // 如果需要负载均衡，可以在这里改为随机或轮询，但"首个可用"最容易排查问题
+  return normalizeHandle(available[0].handle);
+}
+
+/**
+ * 3. 消息格式化 (完整版 - 用于复制)
  */
 export function formatLineMessage(order: Order): string {
   const itemsText = (order.items && order.items.length > 0)
@@ -33,7 +62,8 @@ ${itemsText}
 }
 
 /**
- * 短版消息内容：专门用于手机端跳转链接，防止 URL 过长导致无法唤起
+ * 4. 消息格式化 (短版 - 用于 URL 跳转)
+ * 手机端 URL 长度有限，必须精简
  */
 export function formatShortLineMessage(order: Order): string {
   const firstItem = (order.items && order.items.length > 0) ? order.items[0].title : "商品";
@@ -47,22 +77,26 @@ export function formatShortLineMessage(order: Order): string {
 }
 
 /**
- * 【核心】生成实测稳定的 Universal Link
- * 格式：https://line.me/R/oaMessage/@handle/?{ENCODED_MESSAGE}
+ * 5. 核心：生成 Universal Link
+ * 规则：严格遵循 https://line.me/R/oaMessage/@handle/?{msg}
  */
 export function getLineOrderLink(oaHandle: string | null, message: string): string {
   const handle = normalizeHandle(oaHandle);
-  if (!handle) return "https://line.me";
+  
+  // 如果没有有效 Handle，兜底跳转到 LINE 主页，避免死链
+  if (!handle || handle === "@") return "https://line.me";
+
   const encodedMsg = encodeURIComponent(message);
-  // 必须使用 line.me，禁止使用 www.line.me
+  
+  // ✅ 唯一验证通过的格式
   return `https://line.me/R/oaMessage/${handle}/?${encodedMsg}`;
 }
 
 /**
- * 获取官方账号主页链接（不预填文本的兜底方案）
+ * 6. 加好友链接 (兜底)
  */
 export function getLineAddFriendLink(oaHandle: string | null): string {
   const handle = normalizeHandle(oaHandle);
-  if (!handle) return "https://line.me";
+  if (!handle || handle === "@") return "https://line.me";
   return `https://line.me/R/ti/p/${handle}`;
 }

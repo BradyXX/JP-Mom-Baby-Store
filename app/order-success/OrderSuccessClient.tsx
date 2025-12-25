@@ -19,6 +19,8 @@ export default function OrderSuccessClient() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // 从 SessionStorage 恢复订单数据
+    // 这里的 order 对象中包含了 checkout 时已经确定并保存的 line_oa_handle
     const stored = sessionStorage.getItem('last_order');
     if (stored) {
       const parsed = JSON.parse(stored) as Order;
@@ -32,6 +34,9 @@ export default function OrderSuccessClient() {
     if (!order) return null;
     const fullMsg = formatLineMessage(order);
     const shortMsg = formatShortLineMessage(order);
+    
+    // 这里的 order.line_oa_handle 已经在 checkout 阶段被 normalizeHandle 处理过了
+    // 但为了双重保险，getLineOrderLink 内部会再次 normalize
     return {
       fullMsg,
       orderLink: getLineOrderLink(order.line_oa_handle, shortMsg),
@@ -86,7 +91,7 @@ export default function OrderSuccessClient() {
           </p>
           
           <div className="w-full space-y-4">
-            {/* 主跳转按钮 */}
+            {/* 主跳转按钮: 严格执行 Universal Link 跳转 */}
             <button 
               onClick={handleLineClick}
               className="flex items-center justify-center gap-3 w-full bg-[#06C755] text-white py-5 rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"

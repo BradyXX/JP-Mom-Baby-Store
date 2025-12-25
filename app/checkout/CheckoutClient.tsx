@@ -1,14 +1,26 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, MessageCircle, AlertCircle } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-import { createOrder, getSettings } from '@/lib/supabase/queries';
+import { getSettings } from '@/lib/supabase/queries';
+import { supabase } from '@/lib/supabase/client';
 import { Coupon, AppSettings } from '@/lib/supabase/types';
 import { calculateDiscountAmount } from '@/lib/utils/coupons';
 import { getUtmParams } from '@/lib/utils/utm';
 import { formatLineMessage, getLineDeepLink } from '@/lib/utils/line';
+
+const PREFECTURES = [
+  "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+  "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+  "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+  "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+  "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+  "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
+];
 
 export default function CheckoutClient() {
   const router = useRouter();
@@ -19,6 +31,7 @@ export default function CheckoutClient() {
   const [showRedirectModal, setShowRedirectModal] = useState(false);
   const [pendingLineUrl, setPendingLineUrl] = useState('');
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [orderNo, setOrderNo] = useState<string>('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -28,7 +41,6 @@ export default function CheckoutClient() {
 
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   
-  // Load settings for shipping calculation
   useEffect(() => {
     getSettings().then(setSettings);
   }, []);
@@ -40,6 +52,10 @@ export default function CheckoutClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.prefecture) {
+      setError('都道府県を選択してください');
+      return;
+    }
     if (isSubmitting) return;
 
     setIsSubmitting(true);
@@ -48,7 +64,6 @@ export default function CheckoutClient() {
     try {
       const currentSettings = await getSettings();
       
-      // LINE OA Round Robin
       let oaHandle = '';
       const enabledOAs = (currentSettings.line_oas as any[] || []).filter(oa => oa.enabled && oa.handle);
       if (enabledOAs.length > 0) {
@@ -58,12 +73,12 @@ export default function CheckoutClient() {
         localStorage.setItem('line_rr_idx', (currentIdx + 1).toString());
       }
 
-      const orderNo = `ORD-${new Date().getTime().toString().slice(-8)}`;
+      const newOrderNo = `ORD-${new Date().getTime().toString().slice(-8)}`;
+      setOrderNo(newOrderNo);
 
-      // Construct payload that matches DB schema and OrderItem interface
       const orderPayload: any = {
-        order_no: orderNo,
-        customer_name: `${formData.lastName} ${formData.firstName}`,
+        order_no: newOrderNo,
+        customer_name: `${formData.lastName} ${formData.firstName}`.trim(),
         phone: formData.phone,
         postal_code: formData.postalCode,
         prefecture: formData.prefecture,
@@ -72,52 +87,57 @@ export default function CheckoutClient() {
         address_line2: formData.addressLine2 || null,
         notes: formData.notes || null,
         items: items.map(item => ({
-          productId: item.productId,
-          collectionHandles: item.collectionHandles,
           sku: item.slug, 
           title: item.title, 
-          price: item.price, 
-          qty: item.quantity,
+          price: Number(item.price), 
+          qty: Number(item.quantity),
           image: item.image, 
-          variant: item.variantTitle || null
+          variant: item.variantTitle || null,
+          productId: item.productId
         })),
-        subtotal, 
-        discount_total: discountTotal, 
-        shipping_fee: shippingFee,
-        total,
+        subtotal: Number(subtotal), 
+        discount_total: Number(discountTotal), 
+        shipping_fee: Number(shippingFee),
+        total: Number(total),
         coupon_code: appliedCoupon?.code || null,
         payment_method: 'COD', 
         payment_status: 'pending', 
         status: 'new',
-        line_oa_handle: oaHandle,
+        target_channel: "line",
+        target_line: oaHandle || "",
+        line_oa_handle: oaHandle || "",
         line_confirmed: false,
-        utm: getUtmParams(searchParams)
+        utm: getUtmParams(searchParams) || {},
+        notify_status: 'pending'
       };
 
-      // 1. Insert to Supabase
-      await createOrder(orderPayload);
-      
-      // 2. Generate LINE link and Success Data
+      const { data, error: sbError } = await supabase
+        .from('orders')
+        .insert(orderPayload)
+        .select()
+        .single();
+
+      if (sbError) {
+        throw new Error(`[Error ${sbError.code}] ${sbError.message}`);
+      }
+
       const lineMsg = formatLineMessage(orderPayload);
       const lineLink = getLineDeepLink(oaHandle, lineMsg);
 
       sessionStorage.setItem('last_order', JSON.stringify(orderPayload));
       clearCart();
 
-      // 3. Trigger Redirect
       setPendingLineUrl(lineLink);
       window.location.href = lineLink;
       
-      // Fallback Timer
       setTimeout(() => {
         setShowRedirectModal(true);
         setIsSubmitting(false);
       }, 1500);
 
     } catch (err: any) {
-      console.error('Order Creation Error:', err);
-      // Display detailed error from Supabase to identify RLS or Schema issues
-      setError(`注文の作成に失敗しました: ${err.message || 'Unknown error'}`);
+      console.error('Submit error:', err);
+      setError(err.message || '予期せぬエラーが発生しました');
       setIsSubmitting(false);
     }
   };
@@ -134,22 +154,35 @@ export default function CheckoutClient() {
                  <AlertCircle size={18} className="mt-0.5 shrink-0" />
                  <div className="text-sm">
                    <p className="font-bold">エラーが発生しました</p>
-                   <p>{error}</p>
+                   <p className="break-words">{error}</p>
                  </div>
                </div>
              )}
              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <input placeholder="姓" className="input-base" required onChange={e => setFormData({...formData, lastName: e.target.value})} />
-                  <input placeholder="名" className="input-base" required onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                  <input placeholder="姓" className="input-base" required value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+                  <input placeholder="名" className="input-base" required value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
                 </div>
-                <input placeholder="電話番号" className="input-base" required type="tel" onChange={e => setFormData({...formData, phone: e.target.value})} />
-                <input placeholder="郵便番号" className="input-base" required onChange={e => setFormData({...formData, postalCode: e.target.value})} />
-                <input placeholder="都道府県" className="input-base" required onChange={e => setFormData({...formData, prefecture: e.target.value})} />
-                <input placeholder="市区町村" className="input-base" required onChange={e => setFormData({...formData, city: e.target.value})} />
-                <input placeholder="住所（番地以降）" className="input-base" required onChange={e => setFormData({...formData, addressLine1: e.target.value})} />
-                <input placeholder="建物名・部屋番号" className="input-base" onChange={e => setFormData({...formData, addressLine2: e.target.value})} />
-                <textarea placeholder="備考（オプション）" className="input-base h-24" onChange={e => setFormData({...formData, notes: e.target.value})} />
+                <input placeholder="電話番号" className="input-base" required type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                <input placeholder="郵便番号" className="input-base" required value={formData.postalCode} onChange={e => setFormData({...formData, postalCode: e.target.value})} />
+                
+                {/* Prefecture Select - Fixed to Japan 47 Prefectures */}
+                <select 
+                  className="input-base appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat pr-10" 
+                  required 
+                  value={formData.prefecture} 
+                  onChange={e => setFormData({...formData, prefecture: e.target.value})}
+                >
+                  <option value="" disabled>都道府県を選択してください</option>
+                  {PREFECTURES.map(pref => (
+                    <option key={pref} value={pref}>{pref}</option>
+                  ))}
+                </select>
+
+                <input placeholder="市区町村" className="input-base" required value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                <input placeholder="住所（番地以降）" className="input-base" required value={formData.addressLine1} onChange={e => setFormData({...formData, addressLine1: e.target.value})} />
+                <input placeholder="建物名・部屋番号" className="input-base" value={formData.addressLine2} onChange={e => setFormData({...formData, addressLine2: e.target.value})} />
+                <textarea placeholder="備考（オプション）" className="input-base h-24" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
              </div>
           </section>
         </div>
@@ -185,13 +218,9 @@ export default function CheckoutClient() {
             {isSubmitting ? <Loader2 className="animate-spin" /> : <MessageCircle size={20} />}
             LINEで注文を確定する
           </button>
-          <p className="text-[10px] text-gray-400 mt-4 text-center">
-            ※注文確定後、LINEアプリが起動します。メッセージを送信することで注文が完了します。
-          </p>
         </div>
       </form>
 
-      {/* Redirect Fallback Modal */}
       {showRedirectModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl animate-in zoom-in duration-200">
@@ -202,17 +231,11 @@ export default function CheckoutClient() {
              <p className="text-sm text-gray-500 mb-6 leading-relaxed">
                注文情報を保存しました。配送手配を進めるため、LINEでメッセージを送信してください。
              </p>
-             <a 
-               href={pendingLineUrl} 
-               className="btn-primary w-full bg-[#06C755] hover:bg-[#05b64e] border-none mb-4 py-4 flex items-center justify-center gap-2 text-lg"
-             >
+             <a href={pendingLineUrl} className="btn-primary w-full bg-[#06C755] hover:bg-[#05b64e] border-none mb-4 py-4 flex items-center justify-center gap-2 text-lg">
                <MessageCircle size={24} />
                LINEを開く
              </a>
-             <button 
-               onClick={() => router.push(`/order-success?order_no=${JSON.parse(sessionStorage.getItem('last_order') || '{}').order_no}`)}
-               className="text-gray-400 text-xs hover:underline"
-             >
+             <button onClick={() => router.push(`/order-success?order_no=${orderNo}`)} className="text-gray-400 text-xs hover:underline">
                完了画面へ進む
              </button>
           </div>

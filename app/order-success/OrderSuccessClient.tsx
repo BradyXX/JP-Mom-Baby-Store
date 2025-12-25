@@ -34,34 +34,36 @@ export default function OrderSuccessClient() {
     if (!order) return null;
     const fullMsg = formatLineMessage(order);
     const shortMsg = formatShortLineMessage(order);
-    const schemeLink = getLineSchemeLink(order.line_oa_handle, shortMsg);
-    const universalLink = getLineUniversalLink(order.line_oa_handle, shortMsg);
-    const addFriendLink = getLineAddFriendLink(order.line_oa_handle);
-    return { fullMsg, shortMsg, schemeLink, universalLink, addFriendLink };
+    return {
+      fullMsg,
+      shortMsg,
+      scheme: getLineSchemeLink(order.line_oa_handle, shortMsg),
+      universal: getLineUniversalLink(order.line_oa_handle, shortMsg),
+      friend: getLineAddFriendLink(order.line_oa_handle)
+    };
   }, [order]);
 
-  const handleOpenLine = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleOpenLine = () => {
     if (!lineData) return;
     
+    // 立即唤起
+    window.location.href = lineData.scheme;
+
+    // 定时检查是否留在原页面（说明唤起失败）
     const start = Date.now();
-    // Try App Scheme
-    window.location.href = lineData.schemeLink;
-    
     setTimeout(() => {
-      // Fallback Universal Link
-      window.location.href = lineData.universalLink;
-      
-      setTimeout(() => {
-        // If still in current page after 1.3s total, show manual modal
-        if (Date.now() - start < 2500) {
-          setShowFallbackModal(true);
-        }
-      }, 800);
+      if (Date.now() - start < 1500) {
+        window.location.href = lineData.universal;
+        setTimeout(() => {
+          if (Date.now() - start < 3000) {
+            setShowFallbackModal(true);
+          }
+        }, 1000);
+      }
     }, 500);
   };
 
-  const handleCopy = (e?: React.MouseEvent<HTMLButtonElement>) => {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
+  const handleCopy = () => {
     if (!lineData) return;
     navigator.clipboard.writeText(lineData.fullMsg);
     setCopied(true);
@@ -79,7 +81,7 @@ export default function OrderSuccessClient() {
 
   return (
     <div className="container-base py-8 md:py-20 flex flex-col items-center px-4 max-w-2xl mx-auto">
-      <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center text-green-500 mb-6">
+      <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center text-green-500 mb-6 animate-bounce">
         <CheckCircle2 size={44} strokeWidth={2.5} />
       </div>
 
@@ -111,7 +113,7 @@ export default function OrderSuccessClient() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button 
-                onClick={() => handleCopy()} 
+                onClick={handleCopy} 
                 className={`flex items-center justify-center gap-2 py-4 px-4 rounded-xl text-sm font-bold border transition-colors ${
                   copied ? 'bg-green-50 text-green-600 border-green-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                 }`}
@@ -120,10 +122,10 @@ export default function OrderSuccessClient() {
                 注文情報をコピー
               </button>
               <a 
-                href={lineData.addFriendLink} 
+                href={lineData.friend} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="flex items-center justify-center gap-2 py-4 px-4 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all"
+                className="flex items-center justify-center gap-2 py-4 px-4 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50"
               >
                 公式LINEを追加
                 <ExternalLink size={18} />
@@ -133,53 +135,36 @@ export default function OrderSuccessClient() {
         </div>
       </div>
 
-      <Link href="/" className="text-gray-400 hover:text-primary transition-colors flex items-center gap-1.5 text-sm font-medium">
+      <Link href="/" className="text-gray-400 hover:text-primary flex items-center gap-1.5 text-sm">
         トップページに戻る <ArrowRight size={14} />
       </Link>
 
+      {/* 兜底 Modal */}
       {showFallbackModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in duration-200">
-            <button onClick={() => setShowFallbackModal(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:bg-gray-100 rounded-full">
-              <X size={20}/>
-            </button>
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setShowFallbackModal(false)} className="absolute top-4 right-4 p-2 text-gray-400"><X size={20}/></button>
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-500">
                 <AlertTriangle size={32}/>
               </div>
               <h3 className="text-xl font-bold mb-2">LINEを起動できませんでした</h3>
-              <p className="text-sm text-gray-500">
-                自動で開かなかった場合は、以下の手順で注文を完了してください。
-              </p>
+              <p className="text-sm text-gray-500">自動で開かない場合は、以下の手順をお試しください。</p>
             </div>
             
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-xs font-bold text-gray-400 uppercase mb-2">STEP 1</p>
-                <button 
-                  onClick={() => handleCopy()} 
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between font-bold text-sm text-gray-700"
-                >
-                  注文メッセージをコピー {copied ? <Check size={18} className="text-green-500"/> : <Copy size={18}/>}
+                <button onClick={handleCopy} className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between font-bold text-sm text-gray-700">
+                  メッセージをコピー {copied ? <Check size={18} className="text-green-500"/> : <Copy size={18}/>}
                 </button>
               </div>
               <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-xs font-bold text-gray-400 uppercase mb-2">STEP 2</p>
-                <a 
-                  href={lineData.addFriendLink} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between font-bold text-sm text-gray-700"
-                >
+                <a href={lineData.friend} target="_blank" className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between font-bold text-sm text-gray-700">
                   公式LINEを開いて貼り付け <ExternalLink size={18}/>
                 </a>
               </div>
-              <button 
-                onClick={() => setShowFallbackModal(false)} 
-                className="w-full text-center text-gray-400 text-xs py-2 hover:underline"
-              >
-                閉じる
-              </button>
             </div>
           </div>
         </div>

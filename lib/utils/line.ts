@@ -1,81 +1,77 @@
 import { Order } from "@/lib/supabase/types";
 
 /**
- * 格式化 Handle：由于数据库已存为 @handle 格式，这里直接返回。
- * 仅做基础非空检查。
+ * 规范化 Handle，确保包含 @ 且无多余空格
  */
-function getValidHandle(handle: string | null): string {
-  return handle || '';
+export function normalizeHandle(handle: string | null): string {
+  if (!handle) return "";
+  const trimmed = handle.trim();
+  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
 }
 
 /**
- * 完整消息内容：用于复制到剪贴板
+ * 完整消息内容：用于复制到剪贴板（日本电商风格）
  */
 export function formatLineMessage(order: Order): string {
-  const itemsText = order.items.map(item => 
-    `- ${item.title} x${item.qty}${item.variant ? ` [${item.variant}]` : ''}`
-  ).join('\n');
+  const itemsText = order.items && order.items.length > 0 
+    ? order.items.map(item => `・${item.title} x${item.qty}${item.variant ? ` [${item.variant}]` : ""}`).join("\n")
+    : "（商品情報なし）";
 
-  return `注文確認（COD）
+  return `【注文確認（代金引換）】
 注文番号：${order.order_no}
-お名前：${order.customer_name} 様
-電話：${order.phone}
-住所：〒${order.postal_code} ${order.prefecture}${order.city}${order.address_line1} ${order.address_line2 || ''}
+お名前：${order.customer_name || "未設定"} 様
+電話番号：${order.phone || "未設定"}
+配送先：〒${order.postal_code || ""}
+${order.prefecture || ""}${order.city || ""}${order.address_line1 || ""}
+${order.address_line2 || ""}
 
-商品：
+商品内容：
 ${itemsText}
 
-合計：¥${order.total.toLocaleString()}
-備考：${order.notes || 'なし'}
+合計金額：¥${(order.total || 0).toLocaleString()}
+備考：${order.notes || "なし"}
 
-※このメッセージを送信して注文を確定してください。`;
+→ このメッセージを送信して注文を確定してください。`;
 }
 
 /**
- * 短版消息内容：专门用于移动端 Deep Link，确保 URL 长度在安全范围内
+ * 短版消息内容：用于 URL 传参（避免超过长度限制导致唤起失败）
  */
 export function formatShortLineMessage(order: Order): string {
-  const firstItem = order.items[0];
-  const itemsSummary = order.items.length > 1 
-    ? `${firstItem.title} 外${order.items.length - 1}点`
-    : firstItem.title;
+  if (!order.items || order.items.length === 0) {
+    return `注文確定:${order.order_no}\n合計:¥${(order.total || 0).toLocaleString()}`;
+  }
+  const firstItem = order.items[0].title;
+  const summary = order.items.length > 1 ? `${firstItem} 外${order.items.length - 1}点` : firstItem;
 
-  return `注文確定:${order.order_no}
-氏名:${order.customer_name}
-内容:${itemsSummary}
-合計:¥${order.total.toLocaleString()}
-※このまま送信してください`;
+  return `注文確定:${order.order_no}\n氏名:${order.customer_name}\n内容:${summary}\n合計:¥${(order.total || 0).toLocaleString()}\n※このまま送信してください`;
 }
 
 /**
- * 获取 LINE OA 消息链接 (Universal Link)
- * 禁止使用 www.line.me
- * 格式: https://line.me/R/oaMessage/{HANDLE}/?{ENCODED_MESSAGE}
+ * 获取 Universal Link
+ * 格式：https://line.me/R/oaMessage/@handle/?{MSG}
  */
 export function getLineUniversalLink(oaHandle: string | null, message: string): string {
-  const handle = getValidHandle(oaHandle);
-  if (!handle) return 'https://line.me';
-  const encodedMessage = encodeURIComponent(message);
-  return `https://line.me/R/oaMessage/${handle}/?${encodedMessage}`;
+  const handle = normalizeHandle(oaHandle);
+  if (!handle) return "https://line.me";
+  return `https://line.me/R/oaMessage/${handle}/?${encodeURIComponent(message)}`;
 }
 
 /**
- * 获取 LINE App Scheme 链接 (原生唤起)
- * 格式: line://R/oaMessage/{HANDLE}/?{ENCODED_MESSAGE}
+ * 获取 App Scheme
+ * 格式：line://R/oaMessage/@handle/?{MSG}
  */
 export function getLineSchemeLink(oaHandle: string | null, message: string): string {
-  const handle = getValidHandle(oaHandle);
-  if (!handle) return 'line://';
-  const encodedMessage = encodeURIComponent(message);
-  return `line://R/oaMessage/${handle}/?${encodedMessage}`;
+  const handle = normalizeHandle(oaHandle);
+  if (!handle) return "line://";
+  return `line://R/oaMessage/${handle}/?${encodeURIComponent(message)}`;
 }
 
 /**
- * 获取 LINE 加好友链接 (兜底方案)
- * 格式: https://line.me/R/ti/p/{HANDLE}
+ * 获取加好友链接
  */
 export function getLineAddFriendLink(oaHandle: string | null): string {
-  const handle = getValidHandle(oaHandle);
-  if (!handle) return 'https://line.me';
+  const handle = normalizeHandle(oaHandle);
+  if (!handle) return "https://line.me";
   return `https://line.me/R/ti/p/${handle}`;
 }

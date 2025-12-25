@@ -10,8 +10,7 @@ import { AppSettings } from '@/lib/supabase/types';
 import { getUtmParams } from '@/lib/utils/utm';
 import { 
   formatShortLineMessage, 
-  getLineUniversalLink, 
-  getLineSchemeLink, 
+  getLineOrderLink,
   normalizeHandle 
 } from '@/lib/utils/line';
 
@@ -37,7 +36,9 @@ export default function CheckoutClient() {
     getSettings().then(setSettings);
   }, []);
 
-  const total = getCartTotal() + (settings ? (getCartTotal() >= settings.free_shipping_threshold ? 0 : 600) : 0);
+  const subtotal = getCartTotal();
+  const shippingFee = settings ? (subtotal >= settings.free_shipping_threshold ? 0 : 600) : 0;
+  const total = subtotal + shippingFee;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +55,8 @@ export default function CheckoutClient() {
         selectedOa = enabledOAs[idx % enabledOAs.length].handle;
         localStorage.setItem('line_rr_idx', (idx + 1).toString());
       }
-      setOaHandle(selectedOa);
+      const finalHandle = normalizeHandle(selectedOa);
+      setOaHandle(finalHandle);
 
       const newOrderNo = `ORD-${Date.now().toString().slice(-8)}`;
       setOrderNo(newOrderNo);
@@ -70,12 +72,12 @@ export default function CheckoutClient() {
         address_line2: formData.addressLine2 || null,
         notes: formData.notes || null,
         items: items.map(i => ({ sku: i.slug, title: i.title, price: i.price, qty: i.quantity, image: i.image, variant: i.variantTitle, productId: i.productId })),
-        subtotal: getCartTotal(),
-        shipping_fee: total - getCartTotal(),
+        subtotal,
+        shipping_fee: shippingFee,
         total,
         payment_method: 'COD',
         status: 'new',
-        line_oa_handle: normalizeHandle(selectedOa),
+        line_oa_handle: finalHandle,
         utm: getUtmParams(searchParams)
       };
 
@@ -84,7 +86,7 @@ export default function CheckoutClient() {
 
       sessionStorage.setItem('last_order', JSON.stringify(payload));
       clearCart();
-      setOrderSaved(true);
+      setOrderSaved(true); // 显示引导跳转的 Modal
       setIsSubmitting(false);
     } catch (err: any) {
       setError(err.message);
@@ -92,34 +94,40 @@ export default function CheckoutClient() {
     }
   };
 
-  const handleLineRedirect = () => {
+  /**
+   * 同步点击事件，直接设置 window.location.href
+   * 不包含 await，确保移动端浏览器不会拦截跳转
+   */
+  const handleLineJump = () => {
     const orderData = JSON.parse(sessionStorage.getItem('last_order') || '{}');
     const msg = formatShortLineMessage(orderData);
-    const scheme = getLineSchemeLink(oaHandle, msg);
-    const universal = getLineUniversalLink(oaHandle, msg);
-
-    // 唤起逻辑：尝试原生 Scheme，不行再跳 Universal
-    window.location.href = scheme;
+    const lineUrl = getLineOrderLink(oaHandle, msg);
+    
+    // 直接跳转
+    window.location.href = lineUrl;
+    
+    // 1秒后在浏览器后台跳转到成功页
     setTimeout(() => {
-      window.location.href = universal;
-      setTimeout(() => {
-        router.push(`/order-success?order_no=${orderNo}`);
-      }, 1000);
-    }, 500);
+      router.push(`/order-success?order_no=${orderNo}`);
+    }, 1000);
   };
 
   if (orderSaved) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-sm w-full text-center animate-in zoom-in duration-300">
-          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center animate-in zoom-in duration-300">
+          <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 size={32} />
           </div>
-          <h2 className="text-xl font-bold mb-2">注文を保存しました</h2>
-          <p className="text-sm text-gray-500 mb-8">
-            最後の手続きとして、LINEで注文メッセージを送信してください。
+          <h2 className="text-xl font-bold mb-3">注文を保存しました</h2>
+          <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+            最後の手続きです。<br />
+            下のボタンを押してLINEで注文を確定させてください。
           </p>
-          <button onClick={handleLineRedirect} className="btn-primary w-full py-4 bg-[#06C755] hover:bg-[#05b64e] border-none flex items-center justify-center gap-2 text-lg">
+          <button 
+            onClick={handleLineJump} 
+            className="w-full py-4 bg-[#06C755] text-white rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
+          >
             <MessageCircle size={24} />
             LINEで確定する
           </button>
@@ -157,7 +165,8 @@ export default function CheckoutClient() {
         <div className="bg-gray-50 p-6 rounded-xl h-fit border">
           <h2 className="font-bold mb-6 border-b pb-2">注文内容</h2>
           <div className="space-y-3 mb-6">
-            <div className="flex justify-between text-sm"><span>小計</span><span>¥{getCartTotal().toLocaleString()}</span></div>
+            <div className="flex justify-between text-sm"><span>小計</span><span>¥{subtotal.toLocaleString()}</span></div>
+            <div className="flex justify-between text-sm"><span>送料</span><span>¥{shippingFee.toLocaleString()}</span></div>
             <div className="flex justify-between font-bold text-lg border-t pt-3 mt-3"><span>合計 (税込)</span><span className="text-primary">¥{total.toLocaleString()}</span></div>
           </div>
           <button type="submit" disabled={isSubmitting} className="btn-primary w-full py-4 flex items-center justify-center gap-2 shadow-lg">

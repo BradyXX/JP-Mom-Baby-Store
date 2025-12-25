@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, MessageCircle, Copy, ArrowRight, ExternalLink, AlertTriangle, Check, X } from 'lucide-react';
+import { CheckCircle2, MessageCircle, Copy, ArrowRight, ExternalLink, AlertTriangle, Check } from 'lucide-react';
 import { Order } from '@/lib/supabase/types';
 import { 
   formatLineMessage, 
   formatShortLineMessage, 
-  getLineUniversalLink, 
-  getLineSchemeLink,
+  getLineOrderLink,
   getLineAddFriendLink 
 } from '@/lib/utils/line';
 import Link from 'next/link';
@@ -18,7 +17,6 @@ export default function OrderSuccessClient() {
   const orderNo = searchParams.get('order_no');
   const [order, setOrder] = useState<Order | null>(null);
   const [copied, setCopied] = useState(false);
-  const [showFallbackModal, setShowFallbackModal] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('last_order');
@@ -36,31 +34,15 @@ export default function OrderSuccessClient() {
     const shortMsg = formatShortLineMessage(order);
     return {
       fullMsg,
-      shortMsg,
-      scheme: getLineSchemeLink(order.line_oa_handle, shortMsg),
-      universal: getLineUniversalLink(order.line_oa_handle, shortMsg),
-      friend: getLineAddFriendLink(order.line_oa_handle)
+      orderLink: getLineOrderLink(order.line_oa_handle, shortMsg),
+      friendLink: getLineAddFriendLink(order.line_oa_handle)
     };
   }, [order]);
 
-  const handleOpenLine = () => {
-    if (!lineData) return;
-    
-    // 立即唤起
-    window.location.href = lineData.scheme;
-
-    // 定时检查是否留在原页面（说明唤起失败）
-    const start = Date.now();
-    setTimeout(() => {
-      if (Date.now() - start < 1500) {
-        window.location.href = lineData.universal;
-        setTimeout(() => {
-          if (Date.now() - start < 3000) {
-            setShowFallbackModal(true);
-          }
-        }, 1000);
-      }
-    }, 500);
+  const handleLineClick = () => {
+    if (lineData) {
+      window.location.href = lineData.orderLink;
+    }
   };
 
   const handleCopy = () => {
@@ -74,14 +56,14 @@ export default function OrderSuccessClient() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-4">
         <p className="text-gray-400 mb-4">注文情報が見つかりません。</p>
-        <Link href="/" className="text-primary underline">トップページに戻る</Link>
+        <Link href="/" className="text-primary underline text-sm">トップページに戻る</Link>
       </div>
     );
   }
 
   return (
     <div className="container-base py-8 md:py-20 flex flex-col items-center px-4 max-w-2xl mx-auto">
-      <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center text-green-500 mb-6 animate-bounce">
+      <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center text-green-500 mb-6">
         <CheckCircle2 size={44} strokeWidth={2.5} />
       </div>
 
@@ -92,83 +74,55 @@ export default function OrderSuccessClient() {
 
       <div className="w-full bg-white border border-gray-100 p-6 md:p-10 rounded-3xl mb-10 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-[#06C755]"></div>
+        
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-2 text-amber-600 mb-4">
             <AlertTriangle size={20} />
-            <span className="font-bold text-lg">最後の手続き</span>
+            <span className="font-bold text-lg">重要なお願い</span>
           </div>
-          <p className="text-sm text-gray-600 mb-8 leading-relaxed text-center">
-            配送手配を確定させるため、下のボタンから<br className="hidden md:block" />
+          <p className="text-sm text-gray-600 mb-8 leading-relaxed text-center font-medium">
+            配送手配を確定させるため、以下のボタンから<br />
             <b>LINEで注文メッセージを送信</b>してください。
           </p>
           
           <div className="w-full space-y-4">
+            {/* 主跳转按钮 */}
             <button 
-              onClick={handleOpenLine} 
-              className="flex items-center justify-center gap-3 w-full bg-[#06C755] text-white py-5 rounded-2xl font-bold text-xl shadow-lg transition-transform active:scale-95"
+              onClick={handleLineClick}
+              className="flex items-center justify-center gap-3 w-full bg-[#06C755] text-white py-5 rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
             >
               <MessageCircle size={24} fill="white" />
               LINEでメッセージを送る
             </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 辅助操作栏 */}
+            <div className="grid grid-cols-2 gap-4">
               <button 
-                onClick={handleCopy} 
+                onClick={handleCopy}
                 className={`flex items-center justify-center gap-2 py-4 px-4 rounded-xl text-sm font-bold border transition-colors ${
-                  copied ? 'bg-green-50 text-green-600 border-green-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                  copied ? 'bg-green-50 text-green-600 border-green-200' : 'bg-white text-gray-600 border-gray-200'
                 }`}
               >
                 {copied ? <Check size={18}/> : <Copy size={18}/>}
-                注文情報をコピー
+                情報をコピー
               </button>
               <a 
-                href={lineData.friend} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="flex items-center justify-center gap-2 py-4 px-4 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50"
+                href={lineData.friendLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 py-4 px-4 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold"
               >
-                公式LINEを追加
-                <ExternalLink size={18} />
+                公式LINE
+                <ExternalLink size={16} />
               </a>
             </div>
           </div>
         </div>
       </div>
 
-      <Link href="/" className="text-gray-400 hover:text-primary flex items-center gap-1.5 text-sm">
+      <Link href="/" className="text-gray-400 hover:text-primary flex items-center gap-1.5 text-sm transition-colors">
         トップページに戻る <ArrowRight size={14} />
       </Link>
-
-      {/* 兜底 Modal */}
-      {showFallbackModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative">
-            <button onClick={() => setShowFallbackModal(false)} className="absolute top-4 right-4 p-2 text-gray-400"><X size={20}/></button>
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-500">
-                <AlertTriangle size={32}/>
-              </div>
-              <h3 className="text-xl font-bold mb-2">LINEを起動できませんでした</h3>
-              <p className="text-sm text-gray-500">自動で開かない場合は、以下の手順をお試しください。</p>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-2xl">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-2">STEP 1</p>
-                <button onClick={handleCopy} className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between font-bold text-sm text-gray-700">
-                  メッセージをコピー {copied ? <Check size={18} className="text-green-500"/> : <Copy size={18}/>}
-                </button>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-2xl">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-2">STEP 2</p>
-                <a href={lineData.friend} target="_blank" className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between font-bold text-sm text-gray-700">
-                  公式LINEを開いて貼り付け <ExternalLink size={18}/>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

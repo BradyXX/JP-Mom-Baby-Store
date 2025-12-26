@@ -9,15 +9,26 @@ export type Json =
 
 export interface AppSettings {
   id: number;
+  created_at?: string;
   shop_name: string;
   banner_text: string | null;
-  hero_slides: Json; // Array of { image_url: string, link: string, alt: string }
-  whatsapp_numbers: string[];
+  hero_slides: Json; // DB: jsonb (Array of objects)
+  support_email?: string;
+  support_line?: string;
+  whatsapp_numbers?: string[]; // DB: text[]
   currency: string;
   free_shipping_threshold: number;
   global_coupon_code: string | null;
+  
+  // Singleton control
+  singleton?: boolean;
+
+  // LINE Settings
   line_enabled: boolean;
-  line_oas: string[]; // Changed from complex object array to simple string array ["@handle1", "@handle2"]
+  line_channel?: string;
+  line_notify_mode?: string;
+  line_target_default?: string;
+  line_oas: Json; // DB: jsonb (Stores string[] e.g. ["@abc", "@def"])
   line_rr_index: number;
 }
 
@@ -27,19 +38,57 @@ export interface Product {
   slug: string;
   title_jp: string;
   sku: string;
-  images: string[];
+  images: string[]; // DB: text[]
   price: number;
   compare_at_price: number | null;
   in_stock: boolean;
   stock_qty: number;
   short_desc_jp: string | null;
-  long_desc_sections: Json; // Array of { title: string, content: string }
-  tags: string[];
-  collection_handles: string[];
-  variants: Json; // Array of { id: string, title: string, sku: string, price: number, stock: number }
-  recommended_product_ids: number[];
+  long_desc_sections: Json; // DB: jsonb
+  tags: string; // DB: text (comma separated usually, or just text) - Checking schema said 'text' not 'text[]'
+  collection_handles: string[]; // DB: text[]
+  variants: Json; // DB: jsonb
+  recommended_product_ids: number[]; // DB: int8[]
   active: boolean;
   sort_order: number;
+}
+
+export interface OrderItem {
+  sku: string;
+  title: string;
+  price: number;
+  qty: number;
+  image: string;
+  variant?: string;
+  productId: number;
+}
+
+export interface Order {
+  id?: number;
+  created_at?: string;
+  order_no: string;
+  customer_name: string;
+  phone: string;
+  postal_code: string;
+  prefecture: string;
+  city: string;
+  address_line1: string;
+  address_line2: string | null;
+  notes: string | null;
+  items: Json; // DB: jsonb (Stores OrderItem[])
+  subtotal: number;
+  discount_total: number;
+  shipping_fee: number;
+  total: number;
+  coupon_code: string | null;
+  payment_method: string;
+  payment_status: string;
+  status: string;
+  
+  // Marketing & Tracking
+  utm: Json; // DB: jsonb
+  line_oa_handle: string | null;
+  line_confirmed: boolean;
 }
 
 export interface Coupon {
@@ -58,43 +107,7 @@ export interface Coupon {
   active: boolean;
 }
 
-export interface OrderItem {
-  sku: string;
-  title: string;
-  price: number;
-  qty: number;
-  image: string;
-  variant?: string;
-  productId: number;
-  collectionHandles: string[];
-}
-
-export interface Order {
-  id?: number; // Optional because we don't know it before insert
-  created_at?: string;
-  order_no: string;
-  customer_name: string;
-  phone: string;
-  postal_code: string;
-  prefecture: string;
-  city: string;
-  address_line1: string;
-  address_line2: string | null;
-  notes: string | null;
-  items: OrderItem[]; // Store full JSON structure
-  subtotal: number;
-  discount_total: number;
-  shipping_fee: number;
-  total: number;
-  coupon_code: string | null;
-  payment_method: 'COD' | 'STRIPE' | 'PAYPAL'; // Primarily COD
-  payment_status: 'pending' | 'paid' | 'failed';
-  status: 'new' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
-  utm: Json;
-  line_oa_handle: string | null;
-  line_confirmed: boolean;
-}
-
+// Helper types for App usage
 export interface CartItem {
   productId: number;
   collectionHandles: string[];

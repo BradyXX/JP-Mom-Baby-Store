@@ -29,7 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      // 2. Query admin_users with correct field (user_id)
+      // 2. Query admin_users
       const { data: adminUser } = await supabase
         .from('admin_users')
         .select('user_id, role')
@@ -66,12 +66,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return <>{children}</>;
   }
 
-  // Admin Dashboard layout
+  // Admin Dashboard layout (Fixed Sidebar + Scrollable Content)
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <AdminSidebar />
-      <main className="flex-1 p-8 overflow-y-auto max-h-screen">
-        {children}
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
+      {/* Sidebar - Fixed width, sticky behavior handled by flex layout */}
+      <div className="flex-shrink-0 h-full overflow-y-auto bg-gray-900">
+        <AdminSidebar />
+      </div>
+      
+      {/* Main Content - Takes remaining width, scrollable */}
+      <main className="flex-1 overflow-y-auto h-full">
+        <div className="container-base max-w-6xl mx-auto p-6 md:p-8">
+          {children}
+        </div>
       </main>
     </div>
   );

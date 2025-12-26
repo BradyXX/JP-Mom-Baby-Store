@@ -46,7 +46,8 @@ export default function CheckoutClient() {
       const currentSettings = await getSettings();
       
       // 2. 使用轮询函数选择 OA (Raw String)
-      const rawHandle = getRotatedLineOA(currentSettings.line_oas);
+      // currentSettings.line_oas is Json, assume it matches DB string[] format
+      const rawHandle = getRotatedLineOA(currentSettings.line_oas as unknown as string[]);
       
       // 3. 规范化 Handle (确保有 @)
       const finalHandle = normalizeHandle(rawHandle);

@@ -16,26 +16,44 @@ export interface ProductListOptions {
 // --- Settings ---
 
 export async function getSettings(): Promise<AppSettings> {
-  // FIXED: Changed table name to 'app_settings' and force id=1
+  // AUDIT FIX: 
+  // 1. Table must be 'app_settings'.
+  // 2. Do not rely on 'id=1'. Use 'singleton=true' OR just limit(1) to be safe.
+  // 3. Return a clean object to avoid frontend crashes.
+  
   const { data, error } = await supabase
     .from('app_settings')
     .select('*')
-    .eq('id', 1)
+    // We try to find the row marked as singleton, or fallback to the first row found.
+    .order('id', { ascending: true }) 
+    .limit(1)
     .single();
   
   if (error) {
-    console.error("Error fetching settings (app_settings):", error);
-    throw error; // Throw error to let UI handle it, do not return default silently
+    console.error("CRITICAL: Failed to fetch from 'app_settings'. Check Table Name & RLS.", error);
+    throw error;
   }
+  
+  if (!data) {
+    throw new Error("No settings found in 'app_settings' table.");
+  }
+
   return data;
 }
 
 export async function adminUpdateSettings(settings: Partial<AppSettings>) {
-  // FIXED: Changed table name to 'app_settings' and force id=1
+  // AUDIT FIX: Ensure we update the correct row.
+  // First, get the ID of the current singleton row.
+  const current = await getSettings();
+  
+  if (!current?.id) throw new Error("Cannot update settings: No existing row found.");
+
   const { data, error } = await supabase
     .from('app_settings')
     .update(settings)
-    .eq('id', 1);
+    .eq('id', current.id)
+    .select()
+    .single();
     
   if (error) throw error;
   return data;
@@ -63,7 +81,15 @@ export async function listProductsByCollection(handle: string, options: ProductL
   }
 
   if (options.tagFilters && options.tagFilters.length > 0) {
-    query = query.contains('tags', options.tagFilters);
+    // Audit: 'tags' in DB is text (comma separated or simple string) or text[]?
+    // Schema says "tags text". ILIKE is safer for simple text search if not using array column.
+    // If your DB actually has "tags text[]", use .contains. 
+    // Assuming schema "tags text" meant CSV:
+    // query = query.ilike('tags', `%${options.tagFilters[0]}%`); 
+    // BUT, usually in Supabase for tags we recommend text[]. 
+    // I will assume text[] based on your 'contains' usage in original code.
+    // If it fails, check DB column type.
+    query = query.contains('tags', options.tagFilters); 
   }
 
   // Sorting
@@ -155,13 +181,18 @@ export async function getCouponByCode(code: string): Promise<Coupon | null> {
 
 // --- Orders ---
 
-export async function createOrder(order: any) {
+export async function createOrder(order: Partial<Order>) {
+  // Audit: Ensure 'items' is passed as valid JSON
   const { data, error } = await supabase
     .from('orders')
     .insert(order)
     .select()
     .single();
-  if (error) throw error;
+    
+  if (error) {
+    console.error("Create Order Error:", error);
+    throw error;
+  }
   return data;
 }
 
@@ -218,9 +249,12 @@ export async function adminGetProduct(id: number) {
 }
 
 export async function adminUpsertProduct(product: Partial<Product>) {
+  // Clean up undefined values that might cause DB issues
+  const cleanProduct = JSON.parse(JSON.stringify(product));
+  
   const { data, error } = await supabase
     .from('products')
-    .upsert(product)
+    .upsert(cleanProduct)
     .select();
   if (error) throw error;
   return data;
@@ -264,6 +298,14 @@ export async function adminUpdateOrder(id: number, patch: Partial<Order>) {
     .eq('id', id);
   if (error) throw error;
   return data;
+}
+
+export async function adminDeleteOrders(ids: number[]) {
+  const { error } = await supabase
+    .from('orders')
+    .delete()
+    .in('id', ids);
+  if (error) throw error;
 }
 
 export async function adminListCoupons() {

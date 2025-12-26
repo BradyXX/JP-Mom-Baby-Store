@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getSettings, adminUpdateSettings } from '@/lib/supabase/queries';
 import { AppSettings } from '@/lib/supabase/types';
-import { Save, Plus, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Save, Plus, Trash2, RotateCcw, AlertTriangle, Loader2 } from 'lucide-react';
 import ImageUploader from '@/components/admin/ImageUploader';
 import { normalizeHandle } from '@/lib/utils/line';
 
@@ -21,7 +21,7 @@ export default function AdminSettingsPage() {
       })
       .catch(e => {
         console.error(e);
-        setError(e.message || '設定の読み込みに失敗しました（テーブル名/RLS確認）');
+        setError(e.message || '設定の読み込みに失敗しました（app_settingsテーブル確認）');
         setLoading(false);
       });
   }, []);
@@ -29,26 +29,31 @@ export default function AdminSettingsPage() {
   const handleSave = async () => {
     if (!settings) return;
     
-    // 预处理：确保 LINE OA 都是合法的 @handle 格式
-    const cleanOas = (settings.line_oas || [])
+    // Clean LINE OAs: Remove empty, normalize handles, ensure Unique
+    const rawOas = (settings.line_oas as string[]) || [];
+    const cleanOas = rawOas
       .map(h => normalizeHandle(h))
-      .filter(h => h.length > 1); // 去除空值或只有 @ 的值
-    
-    // 去重
+      .filter(h => h.length > 1);
     const uniqueOas = Array.from(new Set(cleanOas));
 
-    const newSettings = { ...settings, line_oas: uniqueOas };
+    // AUDIT FIX: Explicitly cast types for update to match Partial<AppSettings>
+    const newSettings = { 
+      ...settings, 
+      line_oas: uniqueOas,
+      // Ensure hero_slides is valid JSON (array)
+      hero_slides: Array.isArray(settings.hero_slides) ? settings.hero_slides : []
+    };
 
     try {
       await adminUpdateSettings(newSettings);
-      setSettings(newSettings); // 更新本地状态以反映清洗后的值
+      setSettings(newSettings);
       alert('設定を保存しました');
     } catch (e: any) {
       alert('保存に失敗しました: ' + e.message);
     }
   };
 
-  if (loading) return <div className="p-8">Loading...</div>;
+  if (loading) return <div className="p-8 flex items-center justify-center"><Loader2 className="animate-spin text-gray-400"/></div>;
 
   if (error) {
     return (
@@ -66,7 +71,7 @@ export default function AdminSettingsPage() {
 
   if (!settings) return <div className="p-8">No data found.</div>;
 
-  // 确保类型安全
+  // Type Guards for UI
   const slides = (Array.isArray(settings.hero_slides) ? settings.hero_slides : []) as any[];
   const oas = (Array.isArray(settings.line_oas) ? settings.line_oas : []) as string[];
 
@@ -167,7 +172,7 @@ export default function AdminSettingsPage() {
         </div>
       </section>
 
-      {/* LINE OA Manager (Simplified) */}
+      {/* LINE OA Manager */}
       <section className="bg-white p-6 rounded shadow border border-gray-200">
         <div className="flex justify-between items-center mb-4 border-b pb-2">
            <div className="flex flex-col">
@@ -211,7 +216,7 @@ export default function AdminSettingsPage() {
                   className="input-base rounded-l-none font-mono text-lg"
                   value={handle} 
                   onChange={e => updateOaAtIndex(i, (e.target as HTMLInputElement).value)}
-                  onBlur={e => updateOaAtIndex(i, normalizeHandle((e.target as HTMLInputElement).value))} // Auto format on blur
+                  onBlur={e => updateOaAtIndex(i, normalizeHandle((e.target as HTMLInputElement).value))} 
                 />
                 <button 
                    onClick={() => removeOaAtIndex(i)} 
@@ -222,11 +227,6 @@ export default function AdminSettingsPage() {
              </div>
            ))}
         </div>
-        <p className="text-xs text-gray-400 mt-4">
-          ※ 複数のアカウントを登録すると、注文ごとに自動的に振り分けられます（負荷分散）。
-          <br/>
-          ※ 保存時に自動的に「@」が付加され、重複は削除されます。
-        </p>
       </section>
     </div>
   );

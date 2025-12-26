@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Truck, Clock, ShieldCheck, Banknote } from 'lucide-react';
@@ -12,7 +13,10 @@ interface HeroSlide {
   alt?: string;
 }
 
-export const revalidate = 3600;
+// AUDIT FIX: 
+// 1. revalidate = 0 ensures we don't serve stale cached hero images.
+// 2. Fetch fresh data from DB on every request.
+export const revalidate = 0;
 
 export default async function Home() {
   const settings = await getSettings();
@@ -23,7 +27,7 @@ export default async function Home() {
     listProductsByCollection('toys', { limit: 8 })
   ]);
 
-  // FIX: Properly handle the hero_slides from Json type
+  // AUDIT FIX: Safely parse hero_slides from Jsonb to Array
   const slides = (Array.isArray(settings.hero_slides) 
     ? settings.hero_slides 
     : []) as unknown as HeroSlide[];
@@ -33,9 +37,8 @@ export default async function Home() {
       
       {/* Hero Section */}
       <section className="relative w-full h-[60vh] md:h-[80vh] bg-gray-100 overflow-hidden">
-        {slides.length > 0 ? (
+        {slides.length > 0 && slides[0].image_url ? (
           <div className="relative w-full h-full">
-            {/* Simple Display of First Slide (Can extend to slider later) */}
             <Image 
               src={slides[0].image_url} 
               alt={slides[0].alt || 'Hero Image'} 
@@ -60,6 +63,7 @@ export default async function Home() {
             </div>
           </div>
         ) : (
+          // Fallback if no hero slides are configured
           <div className="flex items-center justify-center h-full text-center px-4 bg-secondary">
              <div>
                 <h1 className="text-3xl md:text-5xl font-bold mb-6 text-gray-800 tracking-tight">
@@ -73,7 +77,7 @@ export default async function Home() {
         )}
       </section>
 
-      {/* ... (Rest of trust badges and carousels) */}
+      {/* Trust Badges */}
       <section className="container-base">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-6 border-b border-gray-100">
           {[

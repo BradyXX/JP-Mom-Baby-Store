@@ -1,5 +1,5 @@
 
-import { Order } from "@/lib/supabase/types";
+import { Order, OrderItem } from "@/lib/supabase/types";
 
 // ==========================================
 // 1. Handle Normalization (Critical)
@@ -71,8 +71,11 @@ export function getRotatedLineOA(handles: string[] | null): string | null {
  * 包含所有详情，格式工整
  */
 export function formatLineMessage(order: Order): string {
-  const itemsText = (order.items && order.items.length > 0)
-    ? order.items.map(item => `・${item.title} x${item.qty}${item.variant ? ` [${item.variant}]` : ""}`).join("\n")
+  // Safe cast items to OrderItem[] as Json type doesn't guarantee array methods
+  const items = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
+
+  const itemsText = (items.length > 0)
+    ? items.map(item => `・${item.title} x${item.qty}${item.variant ? ` [${item.variant}]` : ""}`).join("\n")
     : "（商品情報なし）";
 
   // 使用 || "" 防止 undefined/null 出现在文本中
@@ -94,17 +97,33 @@ ${itemsText}
 /**
  * 短消息：用于【URL Deep Link】
  * 尽可能短，防止 URL 过长截断或编码错误
+ * 包含：代引标识、3日以内配送、送信指引
  */
 export function formatShortLineMessage(order: Order): string {
-  const firstItem = (order.items && order.items.length > 0) ? order.items[0].title : "商品";
-  const extraCount = (order.items && order.items.length > 1) ? ` 他${order.items.length - 1}点` : "";
-  
-  // 精简格式
-  return `注文:${order.order_no || ""}
-氏名:${order.customer_name || ""}
-内訳:${firstItem}${extraCount}
+  // Safe cast items to OrderItem[] as Json type doesn't guarantee array methods
+  const items = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
+
+  // 1. 商品概要 (Safety check + Length limit)
+  let itemSummary = "商品あり";
+  if (items.length > 0) {
+    const title = items[0].title || "商品";
+    // Truncate very long titles to save URL space (15 chars max for first item)
+    const safeTitle = title.length > 15 ? title.substring(0, 14) + "…" : title;
+    const extra = items.length > 1 ? ` 他${items.length - 1}点` : "";
+    itemSummary = `${safeTitle}${extra}`;
+  }
+
+  // 2. Name formatting
+  const name = order.customer_name ? `${order.customer_name} 様` : "お客様";
+
+  // 3. Construct Message
+  return `【代引注文】🛒
+ID:${order.order_no || "---"}
+氏名:${name}
+内容:${itemSummary}
 合計:¥${(order.total || 0).toLocaleString()}
-※このまま送信してください`;
+配送:3日以内予定
+👇このまま送信してください`;
 }
 
 // ==========================================

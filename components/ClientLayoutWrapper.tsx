@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import SearchDrawer from "@/components/drawers/SearchDrawer";
 import CartDrawer from "@/components/drawers/CartDrawer";
 import CookieConsent from "@/components/CookieConsent";
+import MobileBottomNav from "@/components/MobileBottomNav";
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,7 +19,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     return <>{children}</>;
   }
 
-  // Shop Mode: Render full chrome (TopBar removed)
+  // Shop Mode: Render full chrome
   return (
     <>
       <Header />
@@ -29,6 +30,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
       <SearchDrawer />
       <CartDrawer />
       <CookieConsent />
+      <MobileBottomNav />
     </>
   );
 }

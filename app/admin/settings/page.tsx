@@ -122,7 +122,10 @@ export default function AdminSettingsPage() {
       {/* Hero Slides */}
       <section className="bg-white p-6 rounded shadow border border-gray-200">
         <div className="flex justify-between items-center mb-4 border-b pb-2">
-           <h2 className="text-lg font-bold">Hero Slides</h2>
+           <div className="flex flex-col">
+              <h2 className="text-lg font-bold">Hero Slides</h2>
+              <p className="text-xs text-gray-500">スマホ・PCそれぞれの画像を登録してください。両方登録することを推奨します。</p>
+           </div>
            <button 
              onClick={() => setSettings({...settings, hero_slides: [...slides, { image_url: '', mobile_image_url: '', link: '', alt: '' }]})}
              className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded flex items-center gap-1"
@@ -142,9 +145,9 @@ export default function AdminSettingsPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                    {/* Desktop Image */}
                    <div>
-                      <label className="text-xs font-bold block mb-1">PC用画像 (Desktop)</label>
+                      <label className="text-xs font-bold block mb-1 text-blue-600">PC用画像 (Desktop)</label>
                       <div className="mb-2">
-                        {slide.image_url && <img src={slide.image_url} className="h-20 object-cover rounded border" alt="Desktop Preview" />}
+                        {slide.image_url && <img src={slide.image_url} className="h-24 w-full object-cover rounded border" alt="Desktop Preview" />}
                       </div>
                       <ImageUploader 
                         images={[]} 
@@ -154,14 +157,14 @@ export default function AdminSettingsPage() {
                            setSettings({...settings, hero_slides: newSlides});
                         }} 
                       />
-                      <p className="text-[10px] text-gray-400 mt-1">推奨: 横長 (1200x500px等)</p>
+                      <p className="text-[10px] text-gray-400 mt-1">推奨: 横長 (1600x600px, 21:9など)</p>
                    </div>
                    
                    {/* Mobile Image */}
                    <div>
-                      <label className="text-xs font-bold block mb-1">スマホ用画像 (Mobile)</label>
+                      <label className="text-xs font-bold block mb-1 text-green-600">スマホ用画像 (Mobile)</label>
                       <div className="mb-2">
-                        {slide.mobile_image_url && <img src={slide.mobile_image_url} className="h-20 object-cover rounded border" alt="Mobile Preview" />}
+                        {slide.mobile_image_url && <img src={slide.mobile_image_url} className="h-24 w-full object-cover rounded border" alt="Mobile Preview" />}
                       </div>
                       <ImageUploader 
                         images={[]} 
@@ -171,22 +174,28 @@ export default function AdminSettingsPage() {
                            setSettings({...settings, hero_slides: newSlides});
                         }} 
                       />
-                      <p className="text-[10px] text-gray-400 mt-1">推奨: 正方形 or 縦長 (800x800px等)</p>
+                      <p className="text-[10px] text-gray-400 mt-1">推奨: 正方形 or 縦長 (800x800px, 3:4など)</p>
                    </div>
 
                    {/* Other Fields */}
                    <div className="md:col-span-2 space-y-2 mt-2 pt-2 border-t border-gray-100">
                       <div className="grid grid-cols-2 gap-4">
-                        <input placeholder="Link URL" className="input-base" value={slide.link || ''} onChange={e => {
-                           const newSlides = [...slides];
-                           newSlides[i].link = (e.target as HTMLInputElement).value;
-                           setSettings({...settings, hero_slides: newSlides});
-                        }} />
-                        <input placeholder="Alt Text" className="input-base" value={slide.alt || ''} onChange={e => {
-                           const newSlides = [...slides];
-                           newSlides[i].alt = (e.target as HTMLInputElement).value;
-                           setSettings({...settings, hero_slides: newSlides});
-                        }} />
+                        <div>
+                           <label className="text-[10px] font-bold block mb-1">リンク先 URL</label>
+                           <input placeholder="例: /collections/sale" className="input-base" value={slide.link || ''} onChange={e => {
+                              const newSlides = [...slides];
+                              newSlides[i].link = (e.target as HTMLInputElement).value;
+                              setSettings({...settings, hero_slides: newSlides});
+                           }} />
+                        </div>
+                        <div>
+                           <label className="text-[10px] font-bold block mb-1">代替テキスト (Alt)</label>
+                           <input placeholder="画像の説明" className="input-base" value={slide.alt || ''} onChange={e => {
+                              const newSlides = [...slides];
+                              newSlides[i].alt = (e.target as HTMLInputElement).value;
+                              setSettings({...settings, hero_slides: newSlides});
+                           }} />
+                        </div>
                       </div>
                    </div>
                 </div>

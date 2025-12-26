@@ -4,10 +4,9 @@ import { getSettings, listProductsByCollection } from "@/lib/supabase/queries";
 import { Product } from '@/lib/supabase/types';
 import Newsletter from "@/components/Newsletter";
 import { SHOP_CATEGORIES } from "@/lib/categories";
-import HomeHero from '@/components/home/HomeHero'; // Updated Component
+import HomeHero from '@/components/home/HomeHero'; 
 import CategorySection from '@/components/home/CategorySection';
-import CategoryIcon from '@/components/CategoryIcon';
-import InfoCards from '@/components/home/InfoCards'; // New Component
+import InfoCards from '@/components/home/InfoCards'; 
 import { getLineAddFriendLink } from '@/lib/utils/line';
 
 // IMPORTANT: Disable cache to ensure homepage is always fresh
@@ -58,13 +57,12 @@ export default async function Home() {
     // 1. Fetch Global Settings
     const settings = await getSettings();
 
-    // Prepare Slides Data (Safe parsing)
-    // Supports both image_url (desktop) and mobile_image_url
+    // Prepare Slides Data
     const slides = (Array.isArray(settings.hero_slides) 
         ? settings.hero_slides 
         : []) as { image_url: string; mobile_image_url?: string; link?: string; alt?: string }[];
 
-    // Prepare LINE URL (Server-side random selection)
+    // Prepare LINE URL
     const rawOas = (Array.isArray(settings.line_oas) ? settings.line_oas : []) as string[];
     const randomOa = rawOas.length > 0 ? rawOas[Math.floor(Math.random() * rawOas.length)] : null;
     const lineUrl = getLineAddFriendLink(randomOa || null);
@@ -92,39 +90,16 @@ export default async function Home() {
     const sectionsData = await Promise.all(sectionsDataPromises);
 
     return (
-      <div className="bg-white pb-16 space-y-2">
+      <div className="bg-white pb-24 md:pb-16 space-y-2">
         
-        {/* 1. Hero Carousel (Rounded, Boxed) */}
+        {/* 1. Hero Carousel (Desktop/Mobile Adaptive) */}
         <HomeHero slides={slides} />
 
-        {/* 2. Info Cards (3 Columns, LINE link) */}
+        {/* 2. Info Cards (Stacked on Mobile, Grid on Desktop) */}
         <InfoCards lineUrl={lineUrl} />
 
-        {/* 3. Original Category Chips (Quick Nav) - Kept but styled simply */}
-        <section className="container-base py-6 border-b border-gray-50 mt-4">
-          <div className="flex items-center justify-between mb-3 px-1">
-             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">カテゴリー</h4>
-          </div>
-          <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x">
-            {SHOP_CATEGORIES.map((cat) => (
-              <Link 
-                key={cat.id} 
-                href={`/collections/${cat.handle}`}
-                className="flex flex-col items-center gap-2 min-w-[72px] snap-start group cursor-pointer"
-              >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-sm border border-gray-100 group-hover:shadow-md group-hover:scale-105 transition-all ${cat.color || 'bg-gray-100 text-gray-600'}`}>
-                  <CategoryIcon name={cat.iconName} size={24} strokeWidth={1.5} />
-                </div>
-                <span className="text-[10px] font-bold text-gray-600 text-center leading-tight line-clamp-1 w-full px-1 group-hover:text-primary">
-                  {cat.name}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        {/* 4. Product Floors */}
-        <div className="space-y-2 md:space-y-4">
+        {/* 3. Product Floors */}
+        <div className="space-y-2 md:space-y-4 mt-6">
           {sectionsData.map((section) => (
              <CategorySection 
                key={section.category.id} 
@@ -134,15 +109,15 @@ export default async function Home() {
           ))}
         </div>
 
-        {/* 5. Empty State */}
+        {/* 4. Empty State */}
         {sectionsData.every(s => s.products.length === 0) && (
            <div className="py-20 text-center text-gray-400">
               <p>商品準備中...</p>
            </div>
         )}
 
-        {/* 6. Newsletter */}
-        <div className="mt-12">
+        {/* 5. Newsletter */}
+        <div className="mt-12 mb-8">
           <Newsletter />
         </div>
       </div>

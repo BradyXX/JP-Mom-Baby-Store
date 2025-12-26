@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminListProducts, adminBatchUpsertProducts } from '@/lib/supabase/queries';
 import { Product } from '@/lib/supabase/types';
-import { Plus, Edit, FileUp, Loader2, ArrowUpDown } from 'lucide-react';
+import { Plus, Edit, FileUp, Loader2, ArrowUpDown, TableProperties } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
+import CsvImportModal from '@/components/admin/CsvImportModal';
 
 // Sorting options
 const SORT_OPTIONS = [
@@ -21,7 +22,10 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
+  
+  // CSV Import State
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [importing, setImporting] = useState(false); // Legacy JSON import state
 
   // Filter & Sort State
   const [sortIndex, setSortIndex] = useState(0); // Default ID Asc
@@ -56,7 +60,8 @@ export default function AdminProductsPage() {
     if (page > 1) load();
   }, [page]);
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Legacy JSON Import
+  const handleJsonImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -64,9 +69,7 @@ export default function AdminProductsPage() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      
       if (!Array.isArray(data)) throw new Error('Invalid JSON: Must be an array');
-      
       await adminBatchUpsertProducts(data);
       alert(`${data.length}件のアイテムをインポートしました`);
       load();
@@ -89,11 +92,22 @@ export default function AdminProductsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">商品管理</h1>
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          {/* New CSV Import Button */}
+          <button 
+             onClick={() => setIsCsvModalOpen(true)}
+             className="btn-secondary flex items-center gap-2 text-xs md:text-sm py-2 bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+          >
+             <TableProperties size={16} />
+             CSVインポート
+          </button>
+
+          {/* Legacy JSON Import */}
           <label className="btn-secondary flex items-center gap-2 cursor-pointer text-xs md:text-sm py-2">
             {importing ? <Loader2 size={16} className="animate-spin" /> : <FileUp size={16} />}
             JSONインポート
-            <input type="file" accept=".json" className="hidden" onChange={handleImport} disabled={importing} />
+            <input type="file" accept=".json" className="hidden" onChange={handleJsonImport} disabled={importing} />
           </label>
+
           <Link href="/admin/products/new" className="btn-primary flex items-center gap-2 text-xs md:text-sm py-2">
             <Plus size={16} /> 新規登録
           </Link>
@@ -210,6 +224,13 @@ export default function AdminProductsPage() {
          <span className="py-2 text-sm text-gray-500">Page {page}</span>
          <button onClick={() => setPage(page + 1)} className="btn-secondary py-1 px-3 text-xs">Next</button>
       </div>
+
+      {/* The Import Modal */}
+      <CsvImportModal 
+         isOpen={isCsvModalOpen} 
+         onClose={() => setIsCsvModalOpen(false)} 
+         onSuccess={() => { load(); }} // Reload table after import
+      />
     </div>
   );
 }

@@ -33,7 +33,7 @@ export async function getSettings(): Promise<AppSettings> {
       free_shipping_threshold: 10000,
       global_coupon_code: null,
       line_enabled: true,
-      line_oas: [],
+      line_oas: [], // Default to empty string array
       line_rr_index: 0
     };
   }

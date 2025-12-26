@@ -1,31 +1,71 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { getSettings, adminUpdateSettings } from '@/lib/supabase/queries';
 import { AppSettings } from '@/lib/supabase/types';
 import { Save, Plus, Trash2, RotateCcw } from 'lucide-react';
 import ImageUploader from '@/components/admin/ImageUploader';
+import { normalizeHandle } from '@/lib/utils/line';
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getSettings().then(setSettings).catch(e => alert('Failed to load settings'));
+    getSettings()
+      .then(data => {
+        setSettings(data);
+        setLoading(false);
+      })
+      .catch(e => {
+        alert('Failed to load settings');
+        setLoading(false);
+      });
   }, []);
 
   const handleSave = async () => {
     if (!settings) return;
+    
+    // 预处理：确保 LINE OA 都是合法的 @handle 格式
+    const cleanOas = (settings.line_oas || [])
+      .map(h => normalizeHandle(h))
+      .filter(h => h.length > 1); // 去除空值或只有 @ 的值
+    
+    // 去重
+    const uniqueOas = Array.from(new Set(cleanOas));
+
+    const newSettings = { ...settings, line_oas: uniqueOas };
+
     try {
-      await adminUpdateSettings(settings);
+      await adminUpdateSettings(newSettings);
+      setSettings(newSettings); // 更新本地状态以反映清洗后的值
       alert('設定を保存しました');
     } catch (e) {
       alert('保存に失敗しました');
     }
   };
 
-  if (!settings) return <div>Loading...</div>;
+  if (loading || !settings) return <div className="p-8">Loading...</div>;
 
+  // 确保类型安全
   const slides = (Array.isArray(settings.hero_slides) ? settings.hero_slides : []) as any[];
-  const oas = (Array.isArray(settings.line_oas) ? settings.line_oas : []) as any[];
+  const oas = (Array.isArray(settings.line_oas) ? settings.line_oas : []) as string[];
+
+  // Helper to update specific OA index
+  const updateOaAtIndex = (index: number, val: string) => {
+    const newOas = [...oas];
+    newOas[index] = val;
+    setSettings({ ...settings, line_oas: newOas });
+  };
+
+  const removeOaAtIndex = (index: number) => {
+    const newOas = oas.filter((_, i) => i !== index);
+    setSettings({ ...settings, line_oas: newOas });
+  };
+
+  const addOa = () => {
+    setSettings({ ...settings, line_oas: [...oas, '@'] });
+  };
 
   return (
     <div className="max-w-4xl space-y-8 pb-16">
@@ -42,17 +82,14 @@ export default function AdminSettingsPage() {
         <div className="grid grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium mb-1">ショップ名</label>
-            {/* Fixed: Added HTMLInputElement cast to access value */}
             <input className="input-base" value={settings.shop_name} onChange={e => setSettings({...settings, shop_name: (e.target as HTMLInputElement).value})} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">送料無料ライン (¥)</label>
-            {/* Fixed: Added HTMLInputElement cast to access value */}
             <input type="number" className="input-base" value={settings.free_shipping_threshold} onChange={e => setSettings({...settings, free_shipping_threshold: Number((e.target as HTMLInputElement).value)})} />
           </div>
           <div className="col-span-2">
             <label className="block text-sm font-medium mb-1">トップページバナーテキスト</label>
-            {/* Fixed: Added HTMLInputElement cast to access value */}
             <input className="input-base" value={settings.banner_text || ''} onChange={e => setSettings({...settings, banner_text: (e.target as HTMLInputElement).value})} />
           </div>
         </div>
@@ -94,13 +131,11 @@ export default function AdminSettingsPage() {
                       />
                    </div>
                    <div className="space-y-2">
-                      {/* Fixed: Added HTMLInputElement cast to access value */}
                       <input placeholder="Link URL" className="input-base" value={slide.link || ''} onChange={e => {
                          const newSlides = [...slides];
                          newSlides[i].link = (e.target as HTMLInputElement).value;
                          setSettings({...settings, hero_slides: newSlides});
                       }} />
-                      {/* Fixed: Added HTMLInputElement cast to access value */}
                       <input placeholder="Alt Text" className="input-base" value={slide.alt || ''} onChange={e => {
                          const newSlides = [...slides];
                          newSlides[i].alt = (e.target as HTMLInputElement).value;
@@ -113,23 +148,25 @@ export default function AdminSettingsPage() {
         </div>
       </section>
 
-      {/* LINE OA Manager */}
+      {/* LINE OA Manager (Simplified) */}
       <section className="bg-white p-6 rounded shadow border border-gray-200">
         <div className="flex justify-between items-center mb-4 border-b pb-2">
-           <h2 className="text-lg font-bold">LINE公式アカウント (OA)</h2>
+           <div className="flex flex-col">
+             <h2 className="text-lg font-bold">LINE公式アカウント (OA)</h2>
+             <p className="text-xs text-gray-500">注文完了時に使用するLINEアカウントID (@xxxxx) を設定します。</p>
+           </div>
            <button 
-             onClick={() => setSettings({...settings, line_oas: [...oas, { name: '', handle: '', enabled: true }]})}
+             onClick={addOa}
              className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded flex items-center gap-1"
            >
              <Plus size={14}/> 追加
            </button>
         </div>
         
-        <div className="mb-4 flex items-center gap-4">
+        <div className="mb-6 flex items-center gap-4 bg-blue-50 p-3 rounded border border-blue-100">
            <label className="flex items-center gap-2 cursor-pointer">
-              {/* Fixed: Added HTMLInputElement cast to access checked */}
               <input type="checkbox" checked={settings.line_enabled} onChange={e => setSettings({...settings, line_enabled: (e.target as HTMLInputElement).checked})} className="w-5 h-5 accent-green-500" />
-              <span className="font-medium">LINE連携を有効にする</span>
+              <span className="font-bold text-gray-700">LINE連携を有効にする</span>
            </label>
            <button 
              onClick={() => { if(confirm('輪番インデックスをリセットしますか？')) setSettings({...settings, line_rr_index: 0}); }}
@@ -139,57 +176,38 @@ export default function AdminSettingsPage() {
            </button>
         </div>
 
-        <div className="space-y-4">
-           {oas.map((oa, i) => (
-             <div key={i} className="flex items-center gap-4 p-3 border border-gray-200 rounded bg-gray-50">
-                {/* Fixed: Added HTMLInputElement cast to access value */}
+        <div className="space-y-3">
+           {oas.length === 0 && (
+             <div className="text-center py-4 text-gray-400 text-sm italic border border-dashed rounded">
+               アカウントが設定されていません。「追加」ボタンから登録してください。
+             </div>
+           )}
+           {oas.map((handle, i) => (
+             <div key={i} className="flex items-center gap-2">
+                <div className="bg-gray-100 px-3 py-3 rounded-l border border-r-0 border-gray-300 text-gray-500 font-mono text-sm">
+                  OA #{i + 1}
+                </div>
                 <input 
-                  placeholder="OA名 (例: 担当A)" 
-                  className="input-base flex-1" 
-                  value={oa.name} 
-                  onChange={e => {
-                    const newOas = [...oas];
-                    newOas[i].name = (e.target as HTMLInputElement).value;
-                    setSettings({...settings, line_oas: newOas});
-                  }} 
+                  placeholder="@586jucbg" 
+                  className="input-base rounded-l-none font-mono text-lg"
+                  value={handle} 
+                  onChange={e => updateOaAtIndex(i, (e.target as HTMLInputElement).value)}
+                  onBlur={e => updateOaAtIndex(i, normalizeHandle((e.target as HTMLInputElement).value))} // Auto format on blur
                 />
-                {/* Fixed: Added HTMLInputElement cast to access value */}
-                <input 
-                  placeholder="Handle (例: @586jucbg)" 
-                  className="input-base flex-1" 
-                  value={oa.handle} 
-                  onChange={e => {
-                    const newOas = [...oas];
-                    newOas[i].handle = (e.target as HTMLInputElement).value;
-                    setSettings({...settings, line_oas: newOas});
-                  }} 
-                />
-                <label className="flex items-center gap-2 cursor-pointer px-2">
-                   {/* Fixed: Added HTMLInputElement cast to access checked */}
-                   <input 
-                     type="checkbox" 
-                     checked={oa.enabled} 
-                     onChange={e => {
-                        const newOas = [...oas];
-                        newOas[i].enabled = (e.target as HTMLInputElement).checked;
-                        setSettings({...settings, line_oas: newOas});
-                     }}
-                   />
-                   <span className="text-xs">有効</span>
-                </label>
                 <button 
-                   onClick={() => {
-                      const newOas = [...oas];
-                      newOas.splice(i, 1);
-                      setSettings({...settings, line_oas: newOas});
-                   }} 
-                   className="text-red-400 hover:text-red-600"
+                   onClick={() => removeOaAtIndex(i)} 
+                   className="p-3 bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 rounded transition-colors"
                 >
-                   <Trash2 size={16}/>
+                   <Trash2 size={18}/>
                 </button>
              </div>
            ))}
         </div>
+        <p className="text-xs text-gray-400 mt-4">
+          ※ 複数のアカウントを登録すると、注文ごとに自動的に振り分けられます（負荷分散）。
+          <br/>
+          ※ 保存時に自動的に「@」が付加され、重複は削除されます。
+        </p>
       </section>
     </div>
   );

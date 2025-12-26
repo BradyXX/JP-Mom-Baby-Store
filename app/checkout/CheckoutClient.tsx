@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +12,7 @@ import { getUtmParams } from '@/lib/utils/utm';
 import { 
   formatShortLineMessage, 
   getLineOrderLink,
-  getActiveLineOA, // 新增导入
+  getRotatedLineOA, 
   normalizeHandle 
 } from '@/lib/utils/line';
 
@@ -51,21 +52,18 @@ export default function CheckoutClient() {
     setError(null);
 
     try {
-      // 1. 获取最新设置（确保 OA 列表是最新的）
+      // 1. 获取最新设置
       const currentSettings = await getSettings();
       
-      // 2. 【关键修改】使用确定性函数选择 OA
-      // 这里的 logic 对应 lib/line.ts 中的 getActiveLineOA (First Available)
-      // 如果没有可用的，会返回 null
-      const rawHandle = getActiveLineOA(currentSettings.line_oas as any[]);
+      // 2. 使用轮询函数选择 OA (现在传入 string[])
+      const rawHandle = getRotatedLineOA(currentSettings.line_oas);
       
       // 3. 规范化 Handle (确保有 @)
       const finalHandle = normalizeHandle(rawHandle);
       setOaHandle(finalHandle);
 
       if (!finalHandle && currentSettings.line_enabled) {
-        console.warn("No active LINE OA found, but LINE is enabled.");
-        // 不阻断下单，但可能会导致后续跳转到 LINE 主页
+        console.warn("No active LINE OA found, but LINE is enabled. Check Admin Settings.");
       }
 
       const newOrderNo = `ORD-${Date.now().toString().slice(-8)}`;
@@ -109,7 +107,6 @@ export default function CheckoutClient() {
     const msg = formatShortLineMessage(orderData);
     
     // 使用已保存的 oaHandle 生成链接
-    // 此时 oaHandle 已经是规范化后的 @handle
     const lineUrl = getLineOrderLink(oaHandle, msg);
     
     // Universal Link 直接跳转

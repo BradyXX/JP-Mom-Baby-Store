@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -16,7 +17,7 @@ export interface AppSettings {
   free_shipping_threshold: number;
   global_coupon_code: string | null;
   line_enabled: boolean;
-  line_oas: { name: string; handle: string; enabled: boolean }[]; // Specific type for logic
+  line_oas: string[]; // Changed from complex object array to simple string array ["@handle1", "@handle2"]
   line_rr_index: number;
 }
 

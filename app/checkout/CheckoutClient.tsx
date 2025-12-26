@@ -1,15 +1,17 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, MessageCircle, AlertCircle, ShieldCheck, MapPin, ChevronRight, Lock } from 'lucide-react';
+import { Loader2, AlertCircle, ShieldCheck, MapPin, ChevronRight, Lock, Gift, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-import { getSettings } from '@/lib/supabase/queries';
+import { getSettings, getCouponByCode } from '@/lib/supabase/queries';
 import { supabase } from '@/lib/supabase/client';
-import { AppSettings } from '@/lib/supabase/types';
+import { AppSettings, Coupon } from '@/lib/supabase/types';
 import { getUtmParams } from '@/lib/utils/utm';
 import { getRotatedLineOA, normalizeHandle } from '@/lib/utils/line';
-import { getAddressByZip } from '@/app/actions/getAddress'; // Server Action import
+import { getAddressByZip } from '@/app/actions/getAddress';
+import { validateCoupon, calculateDiscountAmount } from '@/lib/utils/coupons';
 
 const PREFECTURES = ["北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"];
 
@@ -26,6 +28,15 @@ export default function CheckoutClient() {
   const [zipLoading, setZipLoading] = useState(false);
   const [zipError, setZipError] = useState('');
 
+  // Coupon States
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  // Mobile Summary Toggle
+  const [showMobileSummary, setShowMobileSummary] = useState(false);
+
   const [formData, setFormData] = useState({
     lastName: '', firstName: '', 
     phone: '', 
@@ -34,24 +45,23 @@ export default function CheckoutClient() {
     notes: ''
   });
 
-  // Ref for programmatically submitting form from sticky footer
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     getSettings().then(setSettings);
   }, []);
 
+  // Totals Calculation
   const subtotal = getCartTotal();
+  const discountAmount = appliedCoupon ? calculateDiscountAmount(appliedCoupon, items, subtotal) : 0;
   const shippingFee = settings ? (subtotal >= settings.free_shipping_threshold ? 0 : 600) : 0;
-  const total = subtotal + shippingFee;
+  const total = Math.max(0, subtotal - discountAmount + shippingFee);
 
   // --- Postal Code Logic ---
   const handleZipChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value;
-    // Format: Half-width numbers only, auto-insert hyphen
     val = val.replace(/[^\d-]/g, '');
     
-    // Auto-hyphenation (e.g., 1234567 -> 123-4567)
     const nums = val.replace(/-/g, '');
     if (nums.length > 3) {
       val = nums.slice(0, 3) + '-' + nums.slice(3, 7);
@@ -62,7 +72,6 @@ export default function CheckoutClient() {
     setFormData(prev => ({ ...prev, postalCode: val }));
     setZipError('');
 
-    // Trigger fetch when 7 digits are entered
     if (nums.length === 7) {
       setZipLoading(true);
       const result = await getAddressByZip(nums);
@@ -73,12 +82,52 @@ export default function CheckoutClient() {
           ...prev,
           prefecture: result.prefecture,
           city: result.city,
-          addressLine1: result.address, // Populate town area
+          addressLine1: result.address, 
         }));
       } else {
         setZipError('郵便番号から住所を取得できませんでした。手動で入力してください。');
       }
     }
+  };
+
+  // --- Coupon Logic ---
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError('');
+    
+    try {
+      // NOTE: Using direct supabase client here since getCouponByCode is a wrapper.
+      // Ideally this should be a Server Action, but for simplicity in this structure:
+      const { data: coupon, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponCode.toUpperCase())
+        .eq('active', true)
+        .maybeSingle();
+
+      if (error || !coupon) {
+        setCouponError('無効なクーポンコードです');
+        setAppliedCoupon(null);
+      } else {
+        const validation = validateCoupon(coupon, subtotal);
+        if (validation.valid) {
+          setAppliedCoupon(coupon);
+          setCouponCode(''); // Clear input on success
+        } else {
+          setCouponError(validation.error || '使用できません');
+          setAppliedCoupon(null);
+        }
+      }
+    } catch (e) {
+      setCouponError('エラーが発生しました');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
   };
 
   // --- Submit Logic ---
@@ -123,6 +172,8 @@ export default function CheckoutClient() {
           productId: i.productId 
         })),
         subtotal,
+        discount_total: discountAmount, // NEW: Save discount
+        coupon_code: appliedCoupon ? appliedCoupon.code : null, // NEW: Save code
         shipping_fee: shippingFee,
         total,
         payment_method: 'COD' as const,
@@ -166,6 +217,79 @@ export default function CheckoutClient() {
       <div className="container-base py-6 md:py-10 max-w-4xl">
         <h1 className="text-xl md:text-2xl font-bold mb-6 text-gray-900">ご購入手続き</h1>
         
+        {/* MOBILE ORDER SUMMARY (Collapsible) */}
+        <div className="md:hidden bg-white border border-gray-200 rounded-lg mb-6 shadow-sm overflow-hidden">
+           <button 
+             onClick={() => setShowMobileSummary(!showMobileSummary)}
+             className="w-full flex justify-between items-center p-4 bg-gray-50 text-sm font-bold text-gray-700"
+           >
+             <span className="flex items-center gap-2">
+               <ShoppingBag size={16} /> 
+               注文内容の確認 {showMobileSummary ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+             </span>
+             <span className="text-primary font-bold">¥{total.toLocaleString()}</span>
+           </button>
+           
+           {showMobileSummary && (
+             <div className="p-4 border-t border-gray-100 animate-in slide-in-from-top-2">
+                <div className="space-y-3 mb-4">
+                   {items.map(item => (
+                      <div key={`${item.productId}-${item.variantId}`} className="flex gap-3 text-sm">
+                        <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 relative border border-gray-200">
+                           {item.image && <img src={item.image} className="object-cover w-full h-full" alt=""/>}
+                           <span className="absolute -top-1 -right-1 bg-gray-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-white font-bold shadow-sm">
+                             {item.quantity}
+                           </span>
+                        </div>
+                        <div className="flex-1">
+                           <p className="line-clamp-1 font-medium text-gray-800">{item.title}</p>
+                           <p className="text-xs text-gray-500">{item.variantTitle}</p>
+                        </div>
+                        <div className="text-right">
+                           <p>¥{(item.price * item.quantity).toLocaleString()}</p>
+                        </div>
+                      </div>
+                   ))}
+                </div>
+                {/* Coupon Input Mobile */}
+                <div className="border-t border-gray-100 pt-4 mb-4">
+                  {!appliedCoupon ? (
+                    <div className="flex gap-2">
+                       <input 
+                         placeholder="クーポンコード" 
+                         className="input-base py-2"
+                         value={couponCode}
+                         onChange={e => setCouponCode(e.target.value)}
+                       />
+                       <button 
+                         type="button"
+                         onClick={handleApplyCoupon}
+                         disabled={couponLoading || !couponCode}
+                         className="btn-secondary whitespace-nowrap px-4 py-2 text-xs"
+                       >
+                         適用
+                       </button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center bg-green-50 border border-green-200 p-2 rounded text-sm">
+                       <span className="text-green-700 font-bold flex items-center gap-1"><Gift size={14}/> {appliedCoupon.code}</span>
+                       <button onClick={removeCoupon} className="text-xs text-gray-500 underline">削除</button>
+                    </div>
+                  )}
+                  {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+                </div>
+
+                <div className="space-y-2 text-sm text-gray-600 border-t border-gray-100 pt-3">
+                   <div className="flex justify-between"><span>小計</span><span>¥{subtotal.toLocaleString()}</span></div>
+                   <div className="flex justify-between"><span>送料</span><span>{shippingFee === 0 ? '無料' : `¥${shippingFee.toLocaleString()}`}</span></div>
+                   {discountAmount > 0 && (
+                      <div className="flex justify-between text-red-500 font-bold"><span>割引</span><span>-¥{discountAmount.toLocaleString()}</span></div>
+                   )}
+                </div>
+             </div>
+           )}
+        </div>
+
         <form ref={formRef} onSubmit={handleSubmit} className="grid md:grid-cols-12 gap-6 md:gap-10">
           
           {/* LEFT COLUMN: FORM */}
@@ -192,7 +316,7 @@ export default function CheckoutClient() {
                     <label className="block text-xs font-bold text-gray-500 mb-1.5">姓 <span className="text-red-500">*</span></label>
                     <input 
                       placeholder="山田" 
-                      className="input-base text-base" // text-base prevents iOS zoom
+                      className="input-base text-base"
                       required 
                       value={formData.lastName} 
                       onChange={e => setFormData({...formData, lastName: e.target.value})} 
@@ -236,7 +360,7 @@ export default function CheckoutClient() {
                       placeholder="123-4567" 
                       className={`input-base text-base pr-10 ${zipError ? 'border-red-300 focus:border-red-400' : ''}`} 
                       required 
-                      type="tel" // Shows numeric keypad on mobile
+                      type="tel" 
                       inputMode="numeric"
                       value={formData.postalCode} 
                       onChange={handleZipChange}
@@ -324,13 +448,13 @@ export default function CheckoutClient() {
             </section>
           </div>
 
-          {/* RIGHT COLUMN: SUMMARY & PAYMENT */}
+          {/* RIGHT COLUMN: SUMMARY & PAYMENT (Desktop) */}
           <div className="md:col-span-5 space-y-6">
             <section className="bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-gray-100 sticky top-24">
-              <h2 className="font-bold text-lg mb-5 border-b border-gray-100 pb-3">注文内容</h2>
+              <h2 className="font-bold text-lg mb-5 border-b border-gray-100 pb-3 hidden md:block">注文内容</h2>
               
-              {/* Items Summary (Collapsed) */}
-              <div className="space-y-3 mb-6 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
+              {/* Items Summary (Desktop Only) */}
+              <div className="space-y-3 mb-6 max-h-48 overflow-y-auto pr-2 scrollbar-hide hidden md:block">
                 {items.map(item => (
                   <div key={`${item.productId}-${item.variantId}`} className="flex gap-3 text-sm">
                     <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 relative">
@@ -350,8 +474,37 @@ export default function CheckoutClient() {
                 ))}
               </div>
 
-              {/* Totals */}
-              <div className="space-y-3 border-t border-gray-100 pt-4 mb-6">
+              {/* Coupon Input Desktop */}
+              <div className="hidden md:block mb-6 pt-4 border-t border-gray-100">
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">クーポンコード</label>
+                  {!appliedCoupon ? (
+                    <div className="flex gap-2">
+                       <input 
+                         placeholder="入力してください" 
+                         className="input-base py-2 text-sm"
+                         value={couponCode}
+                         onChange={e => setCouponCode(e.target.value)}
+                       />
+                       <button 
+                         type="button"
+                         onClick={handleApplyCoupon}
+                         disabled={couponLoading || !couponCode}
+                         className="btn-secondary whitespace-nowrap px-4 py-2 text-xs"
+                       >
+                         適用
+                       </button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center bg-green-50 border border-green-200 p-3 rounded text-sm">
+                       <span className="text-green-700 font-bold flex items-center gap-2"><Gift size={16}/> {appliedCoupon.code}</span>
+                       <button onClick={removeCoupon} className="text-xs text-gray-500 underline hover:text-red-500">削除</button>
+                    </div>
+                  )}
+                  {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+              </div>
+
+              {/* Totals (Desktop) */}
+              <div className="space-y-3 border-t border-gray-100 pt-4 mb-6 hidden md:block">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>小計</span>
                   <span>¥{subtotal.toLocaleString()}</span>
@@ -362,6 +515,12 @@ export default function CheckoutClient() {
                     {shippingFee === 0 ? <span className="text-red-500 font-bold">無料</span> : `¥${shippingFee.toLocaleString()}`}
                   </span>
                 </div>
+                {discountAmount > 0 && (
+                   <div className="flex justify-between text-sm text-red-500 font-bold">
+                     <span>割引</span>
+                     <span>-¥{discountAmount.toLocaleString()}</span>
+                   </div>
+                )}
                 <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-3">
                   <span className="font-bold text-gray-800">合計 (税込)</span>
                   <span className="text-2xl font-bold text-primary">¥{total.toLocaleString()}</span>
@@ -389,7 +548,7 @@ export default function CheckoutClient() {
                   className="btn-primary w-full py-4 text-lg font-bold flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-all"
                 >
                   {isSubmitting ? <Loader2 className="animate-spin" /> : <ShieldCheck size={20} />}
-                  注文を確定する
+                  ご注文を確定する
                 </button>
                 <p className="text-xs text-center text-gray-400 mt-3">
                   SSL暗号化通信により、情報は安全に送信されます
@@ -413,7 +572,7 @@ export default function CheckoutClient() {
                disabled={isSubmitting}
                className="flex-1 bg-primary text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2"
             >
-               {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <span>注文を確定する</span>}
+               {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <span>ご注文を確定する</span>}
                {!isSubmitting && <ChevronRight size={18} className="opacity-80"/>}
             </button>
          </div>

@@ -1,9 +1,9 @@
-
 import Link from 'next/link';
 import { listProductsByCollection, ProductListOptions } from "@/lib/supabase/queries";
 import ProductCard from "@/components/ProductCard";
 import CollectionFilters from "@/components/CollectionFilters";
 import { SHOP_CATEGORIES } from "@/lib/categories";
+import { Product } from '@/lib/supabase/types';
 
 // Use centralized categories for titles, fallback to handle formatter
 const getCollectionTitle = (handle: string) => {
@@ -17,6 +17,32 @@ const getCollectionTitle = (handle: string) => {
   };
   return STATIC_MAP[handle] || handle.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
+
+// Conversion Optimization Sorting Logic
+function sortProductsForConversion(products: Product[], sortParam: string): Product[] {
+  if (sortParam && sortParam !== 'new') return products; // If user explicitly sorted, respect it (logic handled in DB query mostly)
+
+  // Default "Smart" Sort:
+  // 1. Discounted items first (Impulse buy)
+  // 2. Sort Order (Admin curated)
+  // 3. Newest (Freshness)
+  return [...products].sort((a, b) => {
+    // 1. Discount check
+    const isDiscountedA = (a.compare_at_price || 0) > a.price;
+    const isDiscountedB = (b.compare_at_price || 0) > b.price;
+    
+    if (isDiscountedA && !isDiscountedB) return -1;
+    if (!isDiscountedA && isDiscountedB) return 1;
+
+    // 2. Admin Sort Order (Ascending: 0 is top)
+    const rankA = a.sort_order ?? 9999;
+    const rankB = b.sort_order ?? 9999;
+    if (rankA !== rankB) return rankA - rankB;
+
+    // 3. Newest
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
 
 interface PageProps {
   params: { handle: string };
@@ -39,14 +65,18 @@ export default async function CollectionPage({ params, searchParams }: PageProps
     limit: 100, // Hard limit for MVP
     page: Number(searchParams.page) || 1,
     pageSize: 20,
-    sort: (searchParams.sort as any) || 'new',
+    sort: (searchParams.sort as any) || 'new', // Default fetch sort
     inStockOnly: searchParams.inStock === 'true',
     tagFilters: searchParams.tags ? searchParams.tags.split(',') : undefined,
     priceMin: searchParams.minPrice ? Number(searchParams.minPrice) : undefined,
     priceMax: searchParams.maxPrice ? Number(searchParams.maxPrice) : undefined,
   };
 
-  const products = await listProductsByCollection(handle, options);
+  // Fetch
+  const rawProducts = await listProductsByCollection(handle, options);
+  
+  // Apply "Smart Sort" if no explicit user sort is active (or if default 'new')
+  const products = sortProductsForConversion(rawProducts, searchParams.sort || '');
 
   // Aggregate popular tags from the current product list
   const allTags = products.flatMap(p => p.tags || []) as string[];

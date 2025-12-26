@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, ShoppingBag, Zap, Check, MessageCircle, Truck, ShieldCheck, CreditCard } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Zap, Check, MessageCircle, Truck, ShieldCheck, RotateCcw } from 'lucide-react';
 import { Product } from '@/lib/supabase/types';
 import { useCartStore } from '@/store/useCartStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -156,7 +156,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
         <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 leading-snug tracking-tight">{product.title_jp}</h1>
         
         {/* Price Row */}
-        <div className="flex items-end gap-3 mb-6 border-b border-gray-50 pb-4">
+        <div className="flex items-end gap-3 mb-4 pb-2">
           <span className="text-3xl font-bold text-red-600 leading-none tracking-tight">¥{product.price.toLocaleString()}</span>
           {product.compare_at_price && (
             <div className="flex items-center gap-2 mb-1">
@@ -166,6 +166,19 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               </span>
             </div>
           )}
+        </div>
+
+        {/* Trust Badges (Under Price, Always Visible) */}
+        <div className="flex gap-3 mb-6 border-b border-gray-50 pb-4">
+           <div className="flex items-center gap-1 text-xs text-gray-700 font-medium">
+              <ShieldCheck size={14} className="text-green-600"/> 安心検品
+           </div>
+           <div className="flex items-center gap-1 text-xs text-gray-700 font-medium">
+              <Truck size={14} className="text-blue-600"/> 国内発送
+           </div>
+           <div className="flex items-center gap-1 text-xs text-gray-700 font-medium">
+              <RotateCcw size={14} className="text-gray-500"/> 返品OK
+           </div>
         </div>
 
         {/* Short Description (Key Selling Points) - With Fallback Logic */}
@@ -276,24 +289,6 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               在庫切れ
            </div>
         )}
-
-        {/* Shipping Note */}
-        <div className="mt-6 md:mt-8 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-           <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-1">
-             <div className="flex items-center gap-1.5 w-[48%]">
-               <Truck size={16} className="text-blue-500 flex-shrink-0" />
-               <span className="text-xs text-gray-700 font-bold whitespace-nowrap">最短3日でお届け</span>
-             </div>
-             <div className="flex items-center gap-1.5 w-[48%]">
-               <ShieldCheck size={16} className="text-blue-500 flex-shrink-0" />
-               <span className="text-xs text-gray-700 font-bold whitespace-nowrap">安心検品・国内発送</span>
-             </div>
-             <div className="flex items-center gap-1.5 w-full pt-1 border-t border-blue-100/50 mt-1">
-               <CreditCard size={16} className="text-blue-500 flex-shrink-0" />
-               <span className="text-xs text-gray-700 font-bold">代金引換（現金）/ 1万円以上送料無料</span>
-             </div>
-           </div>
-        </div>
       </div>
     </div>
   );

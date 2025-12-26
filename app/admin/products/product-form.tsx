@@ -15,22 +15,28 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   // Track if fields were manually edited to prevent auto-overwrite
   const [touched, setTouched] = useState({ slug: false, sku: false });
 
-  const [formData, setFormData] = useState<Partial<Product>>(initialData || {
-    title_jp: '',
-    slug: '',
-    sku: '',
-    price: 0,
-    compare_at_price: null,
-    stock_qty: 0,
-    in_stock: true,
-    active: true,
-    images: [],
-    tags: [],
-    collection_handles: [],
-    short_desc_jp: '',
-    sort_order: 0,
-    variants: [],
-    recommended_product_ids: []
+  // Fix: Explicitly type default values to prevent "never[] not assignable to string" errors
+  // Product.tags is defined as 'string' in types.ts, so we must initialize with '' not [].
+  const [formData, setFormData] = useState<Partial<Product>>(() => {
+    if (initialData) return initialData;
+    
+    return {
+      title_jp: '',
+      slug: '',
+      sku: '',
+      price: 0,
+      compare_at_price: null,
+      stock_qty: 0,
+      in_stock: true,
+      active: true,
+      images: [] as string[],
+      tags: '', // Fixed: initialized as string, not array
+      collection_handles: [] as string[],
+      short_desc_jp: '',
+      sort_order: 0,
+      variants: [] as any[], // Valid Json type
+      recommended_product_ids: [] as number[]
+    };
   });
 
   useEffect(() => {
@@ -43,8 +49,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
 
     // Generate Slug (Kebab Case)
     if (!initialData && !touched.slug) {
-      // Basic transliteration is hard without a library, so we stick to English chars or simple replacement
-      // If title is purely Japanese, this might result in empty string, which is fine (user must enter)
       const newSlug = formData.title_jp
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphen
@@ -57,7 +61,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
 
     // Generate SKU (Abbreviation)
     if (!initialData && !touched.sku) {
-      // Take first 3 letters of words (ASCII only) or generate random
       const asciiTitle = formData.title_jp.replace(/[^a-zA-Z0-9 ]/g, '');
       const words = asciiTitle.split(' ').filter(w => w.length > 0);
       let prefix = '';
@@ -67,7 +70,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
         prefix = 'PROD';
       }
       
-      // Simple format: PREF-001 (Randomized for now as we don't check DB count here)
       const randomSuffix = Math.floor(100 + Math.random() * 900); 
       const newSku = `${prefix}-${randomSuffix}`;
       
@@ -90,14 +92,12 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   };
 
   // Helper for Number Inputs to avoid "011" issue
-  // We allow string intermediate state conceptually, but binding to number works if we handle empty string
   const handleNumberChange = (field: keyof Product, val: string) => {
     if (val === '') {
       // @ts-ignore - Temporary allowance for empty input while typing
       setFormData({ ...formData, [field]: '' });
       return;
     }
-    // Parse immediately to remove leading zeros
     const num = parseFloat(val);
     if (!isNaN(num)) {
       setFormData({ ...formData, [field]: num });
@@ -118,7 +118,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
               type="text" 
               className="input-base" 
               placeholder="例: オーガニックコットン ベビー肌着"
-              value={formData.title_jp} 
+              value={formData.title_jp || ''} 
               onChange={e => setFormData({...formData, title_jp: e.target.value})} 
             />
           </div>
@@ -148,7 +148,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
                 required 
                 type="text" 
                 className="input-base pr-10" 
-                value={formData.slug} 
+                value={formData.slug || ''} 
                 onChange={e => {
                   setFormData({...formData, slug: e.target.value});
                   setTouched(prev => ({ ...prev, slug: true }));
@@ -172,7 +172,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
                 required 
                 type="text" 
                 className="input-base pr-10" 
-                value={formData.sku} 
+                value={formData.sku || ''} 
                 onChange={e => {
                   setFormData({...formData, sku: e.target.value});
                   setTouched(prev => ({ ...prev, sku: true }));
@@ -239,14 +239,26 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       {/* Section 4: Details */}
       <div>
         <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b">詳細説明</h3>
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1">短い説明 (一覧表示用)</label>
-          <textarea 
-            className="input-base h-24 resize-y" 
-            placeholder="商品一覧や検索結果に表示される短い紹介文です。"
-            value={formData.short_desc_jp || ''} 
-            onChange={e => setFormData({...formData, short_desc_jp: e.target.value})} 
-          />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">短い説明 (一覧表示用)</label>
+            <textarea 
+              className="input-base h-24 resize-y" 
+              placeholder="商品一覧や検索結果に表示される短い紹介文です。"
+              value={formData.short_desc_jp || ''} 
+              onChange={e => setFormData({...formData, short_desc_jp: e.target.value})} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">タグ (カンマ区切り)</label>
+            <input 
+              type="text" 
+              className="input-base" 
+              placeholder="例: ベビー, コットン, 出産祝い"
+              value={formData.tags || ''} 
+              onChange={e => setFormData({...formData, tags: e.target.value})} 
+            />
+          </div>
         </div>
       </div>
 

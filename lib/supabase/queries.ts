@@ -280,13 +280,30 @@ export async function adminGetStats() {
   }
 }
 
-export async function adminListProducts(page: number = 1, limit: number = 50) {
+export interface AdminProductListOptions {
+  page?: number;
+  limit?: number;
+  sort?: { column: string, ascending: boolean };
+  category?: string;
+}
+
+export async function adminListProducts(
+  page: number = 1, 
+  limit: number = 50,
+  sort: { column: string, ascending: boolean } = { column: 'id', ascending: true },
+  category?: string
+) {
   const from = (page - 1) * limit;
   const to = from + limit - 1;
-  return await supabase
-    .from('products')
-    .select('*')
-    .order('created_at', { ascending: false })
+  
+  let query = supabase.from('products').select('*');
+  
+  if (category && category !== 'all') {
+    query = query.contains('collection_handles', [category]);
+  }
+  
+  return await query
+    .order(sort.column, { ascending: sort.ascending })
     .range(from, to);
 }
 

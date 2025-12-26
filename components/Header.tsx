@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Search, ShoppingBag, Menu, X, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@/store/useUIStore';
@@ -10,7 +10,7 @@ import CategoryIcon from '@/components/CategoryIcon';
 // 1. Unified Logistics Bar (Merged Content)
 function LogisticsBar() {
   return (
-    <div className="bg-gray-900 text-white text-[10px] font-medium py-2.5 relative z-50 border-b border-gray-800 transition-colors">
+    <div className="bg-gray-900 text-white text-[10px] font-medium py-2.5 relative z-50 border-b border-gray-800">
       <div className="container-base flex flex-wrap items-center justify-center md:justify-between gap-x-4 gap-y-1 px-4 leading-none">
          
          {/* Left: Primary Value Prop */}
@@ -39,39 +39,22 @@ export default function Header() {
   const { openSearch, openCart } = useUIStore();
   const cartCount = useCartStore((state) => state.getCartCount());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  // Scroll detection for shrinking header
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 40);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   return (
     <>
       {/* 
-         Sticky Container Strategy:
-         Both LogisticsBar and Header stay sticky at the top.
-         The Header shrinks in height when scrolled to give more space to content.
+         Fixed/Sticky Header Structure
+         P0 Fix: Removed scroll listeners and dynamic sizing to prevent layout jitter (CLS).
+         Used fixed height h-14 (mobile) / h-16 (desktop).
       */}
-      <div className="sticky top-0 z-40 bg-white shadow-sm transition-all duration-300">
+      <div className="sticky top-0 z-40 w-full">
         
-        {/* 1. Logistics Bar (Always visible) */}
+        {/* 1. Logistics Bar */}
         <LogisticsBar />
 
         {/* 2. Main Navigation */}
-        <header 
-          className={`border-b border-gray-100 bg-white relative z-20 transition-all duration-300 ease-in-out ${
-            isScrolled ? 'py-0' : 'py-2'
-          }`}
-        >
-          <div className={`container-base flex items-center justify-between transition-all duration-300 ${
-            isScrolled ? 'h-12' : 'h-14 md:h-16'
-          }`}>
+        <header className="border-b border-gray-100 bg-white relative z-20 shadow-sm">
+          <div className="container-base flex items-center justify-between h-14 md:h-16">
             
             {/* Left: Hamburger (Mobile) */}
             <button 
@@ -79,20 +62,16 @@ export default function Header() {
               className="p-2 -ml-2 hover:bg-gray-50 rounded-full lg:hidden text-gray-700"
               aria-label="Menu"
             >
-              <Menu size={isScrolled ? 20 : 24} />
+              <Menu size={24} />
             </button>
 
             {/* Center/Left: Logo */}
-            <Link href="/" className={`font-black tracking-tight text-primary flex-1 lg:flex-none text-center lg:text-left transition-all duration-300 ${
-              isScrolled ? 'text-lg md:text-xl' : 'text-xl md:text-2xl'
-            }`}>
+            <Link href="/" className="font-black tracking-tight text-primary flex-1 lg:flex-none text-center lg:text-left text-xl md:text-2xl">
               MOM<span className="text-accent">&</span>BABY
             </Link>
 
             {/* Center: Desktop Nav */}
-            <nav className={`hidden lg:flex items-center space-x-6 mx-8 transition-opacity duration-300 ${
-              isScrolled ? 'opacity-90' : 'opacity-100'
-            }`}>
+            <nav className="hidden lg:flex items-center space-x-6 mx-8">
               {SHOP_CATEGORIES.slice(0, 7).map((cat) => (
                 <Link 
                   key={cat.id} 
@@ -111,16 +90,16 @@ export default function Header() {
                 className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-700"
                 aria-label="Search"
               >
-                <Search size={isScrolled ? 20 : 22} strokeWidth={2} />
+                <Search size={22} strokeWidth={2} />
               </button>
               <button
                 onClick={openCart}
                 className="p-2 hover:bg-gray-50 rounded-full transition-colors relative text-gray-700"
                 aria-label="Cart"
               >
-                <ShoppingBag size={isScrolled ? 20 : 22} strokeWidth={2} />
+                <ShoppingBag size={22} strokeWidth={2} />
                 {cartCount > 0 && (
-                  <span className="absolute top-0.5 right-0 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 animate-in zoom-in">
+                  <span className="absolute top-0.5 right-0 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1">
                     {cartCount}
                   </span>
                 )}

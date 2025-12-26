@@ -1,7 +1,8 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { adminGetOrder, adminUpdateOrder } from '@/lib/supabase/queries';
-import { Order } from '@/lib/supabase/types';
+import { Order, OrderItem } from '@/lib/supabase/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -25,10 +26,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   useEffect(() => { load(); }, [params.id]);
 
   const updateOrder = async (patch: Partial<Order>) => {
-    if (!order) return;
+    if (!order || !order.id) return;
     if (!confirm('変更を保存しますか？')) return;
     try {
-      await adminUpdateOrder(order.id!, patch);
+      await adminUpdateOrder(order.id, patch);
       await load();
       alert('更新しました');
     } catch (e) {
@@ -37,6 +38,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   };
 
   if (loading || !order) return <Loader2 className="animate-spin" />;
+
+  // FIX: Safely extract items from Json type
+  // This prevents "order.items is possibly null" error during build
+  const items = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
 
   return (
     <div className="max-w-4xl">
@@ -57,8 +62,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               <select 
                 className="input-base" 
                 value={order.status} 
-                // Fixed: Added HTMLSelectElement cast to access value
-                onChange={e => updateOrder({ status: (e.target as HTMLSelectElement).value as any })}
+                onChange={e => updateOrder({ status: (e.target as HTMLSelectElement).value })}
               >
                 <option value="new">新規受付 (new)</option>
                 <option value="processing">処理中 (processing)</option>
@@ -72,8 +76,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               <select 
                 className="input-base" 
                 value={order.payment_status} 
-                // Fixed: Added HTMLSelectElement cast to access value
-                onChange={e => updateOrder({ payment_status: (e.target as HTMLSelectElement).value as any })}
+                onChange={e => updateOrder({ payment_status: (e.target as HTMLSelectElement).value })}
               >
                 <option value="pending">未払い (pending)</option>
                 <option value="paid">支払い済み (paid)</option>
@@ -85,7 +88,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <input 
                         type="checkbox" 
                         checked={order.line_confirmed} 
-                        // Fixed: Added HTMLInputElement cast to access checked
                         onChange={e => updateOrder({ line_confirmed: (e.target as HTMLInputElement).checked })}
                         className="w-5 h-5 accent-green-500"
                     />
@@ -127,39 +129,54 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               </tr>
            </thead>
            <tbody className="divide-y">
-              {order.items.map((item, i) => (
-                 <tr key={i}>
-                    <td className="px-6 py-3">
-                       <div className="flex items-center gap-3">
-                          <img src={item.image} className="w-10 h-10 object-cover rounded bg-gray-100" />
-                          <div>
-                             <p className="font-medium">{item.title}</p>
-                             <p className="text-xs text-gray-500">{item.sku} / {item.variant}</p>
-                          </div>
-                       </div>
+              {/* FIX: Handle empty items safely */}
+              {items.length === 0 ? (
+                 <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">
+                      （商品情報がありません）
                     </td>
-                    <td className="px-6 py-3 text-right">¥{item.price.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-center">{item.qty}</td>
-                    <td className="px-6 py-3 text-right">¥{(item.price * item.qty).toLocaleString()}</td>
                  </tr>
-              ))}
+              ) : (
+                items.map((item, i) => (
+                   <tr key={i}>
+                      <td className="px-6 py-3">
+                         <div className="flex items-center gap-3">
+                            {item.image ? (
+                               <img src={item.image} className="w-10 h-10 object-cover rounded bg-gray-100" alt="" />
+                            ) : (
+                               <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">No Img</div>
+                            )}
+                            <div>
+                               <p className="font-medium">{item.title || "不明な商品"}</p>
+                               <p className="text-xs text-gray-500">{item.sku} {item.variant ? `/ ${item.variant}` : ''}</p>
+                            </div>
+                         </div>
+                      </td>
+                      <td className="px-6 py-3 text-right">¥{(item.price || 0).toLocaleString()}</td>
+                      <td className="px-6 py-3 text-center">{item.qty || 0}</td>
+                      <td className="px-6 py-3 text-right">¥{((item.price || 0) * (item.qty || 0)).toLocaleString()}</td>
+                   </tr>
+                ))
+              )}
            </tbody>
            <tfoot className="bg-gray-50 font-bold">
               <tr>
                  <td colSpan={3} className="px-6 py-2 text-right">小計</td>
-                 <td className="px-6 py-2 text-right">¥{order.subtotal.toLocaleString()}</td>
+                 <td className="px-6 py-2 text-right">¥{(order.subtotal || 0).toLocaleString()}</td>
               </tr>
-              <tr>
-                 <td colSpan={3} className="px-6 py-2 text-right text-red-500">割引 ({order.coupon_code})</td>
-                 <td className="px-6 py-2 text-right text-red-500">-¥{order.discount_total.toLocaleString()}</td>
-              </tr>
+              {order.discount_total > 0 && (
+                <tr>
+                   <td colSpan={3} className="px-6 py-2 text-right text-red-500">割引 {order.coupon_code ? `(${order.coupon_code})` : ''}</td>
+                   <td className="px-6 py-2 text-right text-red-500">-¥{(order.discount_total || 0).toLocaleString()}</td>
+                </tr>
+              )}
               <tr>
                  <td colSpan={3} className="px-6 py-2 text-right">送料</td>
-                 <td className="px-6 py-2 text-right">¥{order.shipping_fee.toLocaleString()}</td>
+                 <td className="px-6 py-2 text-right">¥{(order.shipping_fee || 0).toLocaleString()}</td>
               </tr>
               <tr className="text-lg border-t border-gray-300">
                  <td colSpan={3} className="px-6 py-4 text-right">合計</td>
-                 <td className="px-6 py-4 text-right">¥{order.total.toLocaleString()}</td>
+                 <td className="px-6 py-4 text-right">¥{(order.total || 0).toLocaleString()}</td>
               </tr>
            </tfoot>
         </table>

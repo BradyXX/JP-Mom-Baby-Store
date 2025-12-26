@@ -72,7 +72,7 @@ export function getRotatedLineOA(handles: string[] | null): string | null {
  */
 export function formatLineMessage(order: Order): string {
   // Safe cast items to OrderItem[] as Json type doesn't guarantee array methods
-  const items = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
+  const items = (Array.isArray(order.items) ? order.items : []) as unknown as OrderItem[];
 
   const itemsText = (items.length > 0)
     ? items.map(item => `・${item.title} x${item.qty}${item.variant ? ` [${item.variant}]` : ""}`).join("\n")
@@ -101,7 +101,7 @@ ${itemsText}
  */
 export function formatShortLineMessage(order: Order): string {
   // Safe cast items to OrderItem[] as Json type doesn't guarantee array methods
-  const items = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
+  const items = (Array.isArray(order.items) ? order.items : []) as unknown as OrderItem[];
 
   // 1. 商品概要 (Safety check + Length limit)
   let itemSummary = "商品あり";

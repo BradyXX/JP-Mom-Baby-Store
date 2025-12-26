@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, ShoppingBag, Menu, X } from 'lucide-react';
 import { useUIStore } from '@/store/useUIStore';
@@ -8,18 +8,28 @@ import { useCartStore } from '@/store/useCartStore';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 import CategoryIcon from '@/components/CategoryIcon';
 
-// 1. Logistics Bar (Topmost)
+// 1. Unified Logistics Bar (Merged Content)
 function LogisticsBar() {
   return (
-    <div className="bg-gray-900 text-white text-[10px] md:text-xs py-2.5 overflow-hidden relative border-b border-gray-800">
-      <div className="container-base flex items-center justify-between px-4">
-         <div className="flex items-center gap-4 overflow-x-auto whitespace-nowrap scrollbar-hide flex-1">
-            <span className="flex items-center gap-1.5"><span className="text-green-400">●</span> 全日本配送</span>
-            <span className="flex items-center gap-1.5"><span className="text-green-400">●</span> 3日以内にお届け</span>
-            <span className="hidden md:flex items-center gap-1.5"><span className="text-green-400">●</span> 代金引換OK</span>
+    <div className="bg-gray-900 text-white text-[10px] font-medium py-2.5 relative z-50 border-b border-gray-800 transition-colors">
+      <div className="container-base flex flex-wrap items-center justify-center md:justify-between gap-x-4 gap-y-1 px-4 leading-none">
+         
+         {/* Left: Primary Value Prop (From old TopBar) */}
+         <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            <span className="font-bold tracking-wide">全品送料無料・日本国内発送</span>
          </div>
-         <div className="hidden md:block text-gray-400 text-[10px]">
-            10,000円以上で送料無料
+
+         {/* Right: Detailed Trust Badges */}
+         <div className="flex flex-wrap items-center justify-center gap-3 text-gray-300 opacity-90">
+            <span className="hidden sm:inline text-gray-700">|</span>
+            <span>全日本配送</span>
+            <span className="hidden sm:inline text-gray-700">|</span>
+            <span>3日以内にお届け</span>
+            <span className="hidden sm:inline text-gray-700">|</span>
+            <span>代金引換OK</span>
+            <span className="hidden sm:inline text-gray-700">|</span>
+            <span className="text-yellow-500/90">10,000円以上で送料無料</span>
          </div>
       </div>
     </div>
@@ -30,23 +40,39 @@ export default function Header() {
   const { openSearch, openCart } = useUIStore();
   const cartCount = useCartStore((state) => state.getCartCount());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Scroll detection for shrinking header
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 40);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <>
       {/* 
          Sticky Container Strategy:
-         We make the entire wrapper sticky. 
-         The LogisticsBar sits on top, followed by the Header.
-         This ensures the LogisticsBar stays visible as requested.
+         Both LogisticsBar and Header stay sticky at the top.
+         The Header shrinks in height when scrolled to give more space to content.
       */}
       <div className="sticky top-0 z-40 bg-white shadow-sm transition-all duration-300">
         
-        {/* 1. Logistics Bar (Always visible in this layout) */}
+        {/* 1. Logistics Bar (Always visible) */}
         <LogisticsBar />
 
         {/* 2. Main Navigation */}
-        <header className="border-b border-gray-100 bg-white relative z-20">
-          <div className="container-base flex items-center justify-between h-14 md:h-16">
+        <header 
+          className={`border-b border-gray-100 bg-white relative z-20 transition-all duration-300 ease-in-out ${
+            isScrolled ? 'py-0' : 'py-2'
+          }`}
+        >
+          <div className={`container-base flex items-center justify-between transition-all duration-300 ${
+            isScrolled ? 'h-12' : 'h-14 md:h-16'
+          }`}>
             
             {/* Left: Hamburger (Mobile) */}
             <button 
@@ -54,16 +80,20 @@ export default function Header() {
               className="p-2 -ml-2 hover:bg-gray-50 rounded-full lg:hidden text-gray-700"
               aria-label="Menu"
             >
-              <Menu size={24} />
+              <Menu size={isScrolled ? 20 : 24} />
             </button>
 
             {/* Center/Left: Logo */}
-            <Link href="/" className="text-xl md:text-2xl font-black tracking-tight text-primary flex-1 lg:flex-none text-center lg:text-left">
+            <Link href="/" className={`font-black tracking-tight text-primary flex-1 lg:flex-none text-center lg:text-left transition-all duration-300 ${
+              isScrolled ? 'text-lg md:text-xl' : 'text-xl md:text-2xl'
+            }`}>
               MOM<span className="text-accent">&</span>BABY
             </Link>
 
-            {/* Center: Desktop Nav */}
-            <nav className="hidden lg:flex items-center space-x-6 mx-8">
+            {/* Center: Desktop Nav (Hide text on scroll to clean up view if very dense, but standard is keeping it) */}
+            <nav className={`hidden lg:flex items-center space-x-6 mx-8 transition-opacity duration-300 ${
+              isScrolled ? 'opacity-90' : 'opacity-100'
+            }`}>
               {SHOP_CATEGORIES.slice(0, 7).map((cat) => (
                 <Link 
                   key={cat.id} 
@@ -82,14 +112,14 @@ export default function Header() {
                 className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-700"
                 aria-label="Search"
               >
-                <Search size={22} strokeWidth={2} />
+                <Search size={isScrolled ? 20 : 22} strokeWidth={2} />
               </button>
               <button
                 onClick={openCart}
                 className="p-2 hover:bg-gray-50 rounded-full transition-colors relative text-gray-700"
                 aria-label="Cart"
               >
-                <ShoppingBag size={22} strokeWidth={2} />
+                <ShoppingBag size={isScrolled ? 20 : 22} strokeWidth={2} />
                 {cartCount > 0 && (
                   <span className="absolute top-0.5 right-0 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 animate-in zoom-in">
                     {cartCount}

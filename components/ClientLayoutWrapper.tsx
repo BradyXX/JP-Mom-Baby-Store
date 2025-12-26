@@ -2,7 +2,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import TopBar from "@/components/TopBar";
+// TopBar removed
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import SearchDrawer from "@/components/drawers/SearchDrawer";
@@ -18,10 +18,9 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     return <>{children}</>;
   }
 
-  // Shop Mode: Render full chrome
+  // Shop Mode: Render full chrome (TopBar removed)
   return (
     <>
-      <TopBar />
       <Header />
       <main className="min-h-screen">
         {children}

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getProductBySlug, listProductsByIds } from "@/lib/supabase/queries";
 import ProductDetail from "@/components/ProductDetail";
 import ProductDescription from "@/components/ProductDescription";
+import ProductTrustSection from "@/components/ProductTrustSection";
 import Accordion from "@/components/Accordion";
 import Carousel from "@/components/Carousel";
 import ProductCard from "@/components/ProductCard";
@@ -31,6 +32,10 @@ export default async function ProductPage({ params }: { params: { slug: string }
       {/* Top Section */}
       <div className="container-base py-4 md:py-12">
         <ProductDetail product={product} />
+        {/* NEW: Trust Section Below Top Info */}
+        <div className="mt-8 max-w-xl">
+           <ProductTrustSection />
+        </div>
       </div>
 
       <div className="border-t border-gray-100 my-4 md:my-8" />

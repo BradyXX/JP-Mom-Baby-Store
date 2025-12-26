@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, ShoppingBag, Zap, Check } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Zap, Check, MessageCircle } from 'lucide-react';
 import { Product } from '@/lib/supabase/types';
 import { useCartStore } from '@/store/useCartStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -241,6 +241,11 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               在庫切れ
             </button>
           )}
+          {/* Desktop Trust Text */}
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
+             <MessageCircle size={14} />
+             <span>ママの安心を最優先に。わからないことはLINEで気軽に相談。</span>
+          </div>
         </div>
 
         {/* Mobile Sticky Footer (Replaces standard add to cart) */}
@@ -269,7 +274,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
            </div>
         )}
 
-        {/* Shipping Note */}
+        {/* Shipping Note (Mobile/Desktop) */}
         <div className="mt-6 md:mt-8 p-4 bg-blue-50/50 rounded-lg text-xs text-gray-600 space-y-2 border border-blue-100">
            <div className="flex items-center gap-2">
              <Check size={14} className="text-blue-500" />

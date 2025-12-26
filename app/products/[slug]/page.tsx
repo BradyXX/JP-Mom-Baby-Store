@@ -58,23 +58,26 @@ export default async function ProductPage({ params }: { params: { slug: string }
            <ProductDescription sections={descriptionSections} />
         </section>
         
-        {/* Trust Section (General Policies) */}
+        {/* Trust Section (Detailed Policies) */}
         <div className="max-w-xl mx-auto">
            <ProductTrustSection />
         </div>
 
-        {/* FAQs */}
+        {/* FAQs - General Service Questions */}
         <section className="bg-gray-50 p-6 rounded-2xl">
           <h3 className="font-bold text-gray-800 mb-4 text-center">よくある質問</h3>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-2">
-            <Accordion title="送料はいくらですか？">
-              <p>全国一律600円です。10,000円以上のお買い上げで送料無料となります。</p>
+            <Accordion title="Q. いつ届きますか？">
+              <p>通常ご注文後、1〜3営業日以内に国内倉庫（大阪・東京）より発送いたします。発送後は追跡番号をメールまたはLINEにてお知らせします。</p>
             </Accordion>
-            <Accordion title="返品・交換はできますか？">
-              <p>商品到着後7日以内であれば、未使用品に限り返品・交換を承ります。カスタマーサポートまでご連絡ください。</p>
+            <Accordion title="Q. 支払い方法は？">
+              <p>「代金引換（現金のみ）」に対応しています。商品受け取り時に配達員へお支払いください。クレジットカード情報の入力が不要で安心です。</p>
             </Accordion>
-            <Accordion title="ギフトラッピングは対応していますか？">
-              <p>はい、+300円でギフトラッピングを承っております。カート画面でご指定いただけます。</p>
+            <Accordion title="Q. 返品・交換はできますか？">
+              <p>はい、初期不良やサイズ違いなど、商品到着後7日以内であれば対応可能です。未使用の状態に限りますので、まずはご相談ください。</p>
+            </Accordion>
+            <Accordion title="Q. LINEで問い合わせできますか？">
+              <p>はい、LINE公式アカウントから24時間お問い合わせを受け付けています（返信は営業時間内となります）。注文後の変更や相談もLINEが便利です。</p>
             </Accordion>
           </div>
         </section>

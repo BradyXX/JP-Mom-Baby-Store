@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, ShoppingBag, Zap, Check, MessageCircle, Truck, ShieldCheck, RotateCcw } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Zap, Check, Truck, ShieldCheck, RotateCcw, Clock, Wallet, Flame } from 'lucide-react';
 import { Product } from '@/lib/supabase/types';
 import { useCartStore } from '@/store/useCartStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -89,8 +89,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       {/* Image Gallery */}
       <div className="space-y-4 -mx-4 md:mx-0">
         
-        {/* Mobile: Tighter Constraint (max-h-[420px] or 55vh) */}
-        <div className="md:hidden relative w-full h-[55vh] max-h-[420px] bg-white border-b border-gray-100">
+        {/* Mobile: 1:1 Square (Fold optimization) */}
+        <div className="md:hidden relative w-full aspect-square bg-white border-b border-gray-100">
           <div 
              ref={mobileScrollRef}
              onScroll={handleMobileScroll}
@@ -151,12 +151,21 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       </div>
 
       {/* Info & Actions */}
-      <div className="px-4 md:px-0">
+      <div className="px-5 md:px-0">
+        
+        {/* P2 - Social Proof */}
+        <div className="flex items-center gap-2 mb-2">
+           <span className="bg-amber-100 text-amber-700 text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Flame size={12} className="fill-amber-700" /> 人気商品
+           </span>
+           <span className="text-[10px] md:text-xs text-gray-500 font-medium">👶 ママに選ばれています</span>
+        </div>
+
         {/* Title */}
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 leading-snug tracking-tight">{product.title_jp}</h1>
+        <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-relaxed tracking-tight">{product.title_jp}</h1>
         
         {/* Price Row */}
-        <div className="flex items-end gap-3 mb-4 pb-2">
+        <div className="flex items-end gap-3 pb-2 border-b border-gray-50">
           <span className="text-3xl font-bold text-red-600 leading-none tracking-tight">¥{product.price.toLocaleString()}</span>
           {product.compare_at_price && (
             <div className="flex items-center gap-2 mb-1">
@@ -168,23 +177,34 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           )}
         </div>
 
-        {/* Trust Badges (Under Price, Always Visible) */}
-        <div className="flex gap-3 mb-6 border-b border-gray-50 pb-4">
-           <div className="flex items-center gap-1 text-xs text-gray-700 font-medium">
-              <ShieldCheck size={14} className="text-green-600"/> 安心検品
+        {/* P2 - Urgency (Soft) */}
+        <div className="mt-2 mb-4">
+           <p className="text-xs text-red-600 font-bold flex items-center gap-1">
+               <Clock size={14} /> 
+               <span>本日ご注文で<span className="underline decoration-red-300 decoration-2 underline-offset-2">最短3日以内</span>にお届け</span>
+           </p>
+        </div>
+
+        {/* Product Specific Features (Value Prop) */}
+        <div className="bg-secondary/60 p-4 rounded-lg mb-6 text-sm text-gray-700 space-y-2 border border-gray-100">
+           <div className="flex items-center gap-2 font-medium">
+              <Check className="text-primary flex-shrink-0" size={16} strokeWidth={3} /> 
+              <span>対象年齢：生後6ヶ月以上</span>
            </div>
-           <div className="flex items-center gap-1 text-xs text-gray-700 font-medium">
-              <Truck size={14} className="text-blue-600"/> 国内発送
+           <div className="flex items-center gap-2 font-medium">
+              <Check className="text-primary flex-shrink-0" size={16} strokeWidth={3} /> 
+              <span>安全検品済・日本国内発送</span>
            </div>
-           <div className="flex items-center gap-1 text-xs text-gray-700 font-medium">
-              <RotateCcw size={14} className="text-gray-500"/> 返品OK
+           <div className="flex items-center gap-2 font-medium">
+              <Check className="text-primary flex-shrink-0" size={16} strokeWidth={3} /> 
+              <span>音楽＆いないいないばあ機能</span>
            </div>
         </div>
 
-        {/* Short Description (Key Selling Points) - With Fallback Logic */}
+        {/* Short Description (Summary) */}
         {shortDescription && (
           <div className="mb-6">
-             <p className="text-base text-gray-700 font-medium leading-relaxed whitespace-pre-wrap">
+             <p className="text-sm md:text-base text-gray-600 font-medium leading-relaxed line-clamp-4">
                 {shortDescription}
              </p>
           </div>
@@ -212,7 +232,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           </div>
         ))}
 
-        {/* Desktop Quantity & Actions */}
+        {/* Desktop Actions (Hidden on Mobile) */}
         <div className="hidden md:block border-t border-gray-100 pt-6 mt-6">
           {product.in_stock ? (
             <div className="flex flex-col gap-4">
@@ -257,14 +277,37 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               在庫切れ
             </button>
           )}
-          {/* Desktop Trust Text */}
-          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
-             <MessageCircle size={14} />
-             <span>ママの安心を最優先に。わからないことはLINEで気軽に相談。</span>
-          </div>
         </div>
 
-        {/* Mobile Sticky Footer (Replaces standard add to cart) */}
+        {/* P1 - Trust Module (Visible on ALL screens below CTA area) */}
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+             <div className="flex items-center gap-2.5 text-xs font-bold text-gray-700">
+                <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-gray-200 text-primary shrink-0">
+                  <Truck size={14} />
+                </div>
+                <span>全日本配送｜最短3日以内お届け</span>
+             </div>
+             <div className="flex items-center gap-2.5 text-xs font-bold text-gray-700">
+                <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-gray-200 text-primary shrink-0">
+                  <Wallet size={14} />
+                </div>
+                <span>代金引換対応（後払い）</span>
+             </div>
+             <div className="flex items-center gap-2.5 text-xs font-bold text-gray-700">
+                <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-gray-200 text-primary shrink-0">
+                  <ShieldCheck size={14} />
+                </div>
+                <span>安心の検品・品質チェック済み</span>
+             </div>
+             <div className="flex items-center gap-2.5 text-xs font-bold text-gray-700">
+                <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-gray-200 text-primary shrink-0">
+                  <RotateCcw size={14} />
+                </div>
+                <span>初期不良は返品・交換対応</span>
+             </div>
+        </div>
+
+        {/* Mobile Sticky Footer */}
         {product.in_stock ? (
           <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 p-3 pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
              <div className="flex gap-2 max-w-md mx-auto">

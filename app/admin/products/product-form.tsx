@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -15,8 +14,10 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   // Track if fields were manually edited to prevent auto-overwrite
   const [touched, setTouched] = useState({ slug: false, sku: false });
 
+  // Temp state for the simple "Long Description" text editor
+  const [longDescText, setLongDescText] = useState('');
+
   // Fix: Explicitly type default values to prevent "never[] not assignable to string" errors
-  // Product.tags is defined as 'string' in types.ts, so we must initialize with '' not [].
   const [formData, setFormData] = useState<Partial<Product>>(() => {
     if (initialData) return initialData;
     
@@ -30,18 +31,28 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       in_stock: true,
       active: true,
       images: [] as string[],
-      tags: '', // Fixed: initialized as string, not array
+      tags: '', 
       collection_handles: [] as string[],
       short_desc_jp: '',
       sort_order: 0,
-      variants: [] as any[], // Valid Json type
-      recommended_product_ids: [] as number[]
+      variants: [] as any[], 
+      recommended_product_ids: [] as number[],
+      long_desc_sections: [] as any[],
     };
   });
 
   useEffect(() => {
     listCollections().then(setCollections);
-  }, []);
+    
+    // Initialize longDescText from JSON if it exists and looks like a simple text block
+    if (initialData?.long_desc_sections && Array.isArray(initialData.long_desc_sections)) {
+       const sections = initialData.long_desc_sections as any[];
+       const textSection = sections.find(s => s.type === 'text');
+       if (textSection) {
+          setLongDescText(textSection.content || '');
+       }
+    }
+  }, [initialData]);
 
   // Auto-generation Logic
   useEffect(() => {
@@ -51,8 +62,8 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
     if (!initialData && !touched.slug) {
       const newSlug = formData.title_jp
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphen
-        .replace(/^-+|-+$/g, '');   // Trim hyphens
+        .replace(/[^a-z0-9]+/g, '-') 
+        .replace(/^-+|-+$/g, '');   
       
       if (newSlug.length > 0) {
         setFormData(prev => ({ ...prev, slug: newSlug }));
@@ -80,8 +91,33 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    
+    // Package the long description text into the JSON format
+    // Prefer preserving existing images if they exist in the JSON structure, 
+    // but for this simple editor, we might just append/update the text section.
+    let finalSections = (formData.long_desc_sections as any[]) || [];
+    
+    // Simple logic: If we have text, ensure a 'text' type section exists
+    if (longDescText.trim()) {
+       const existingTextIdx = finalSections.findIndex(s => s.type === 'text');
+       if (existingTextIdx >= 0) {
+          finalSections[existingTextIdx].content = longDescText;
+       } else {
+          // Add to beginning
+          finalSections = [{ type: 'text', content: longDescText }, ...finalSections];
+       }
+    } else {
+       // Remove text section if empty
+       finalSections = finalSections.filter(s => s.type !== 'text');
+    }
+
+    const payload = {
+       ...formData,
+       long_desc_sections: finalSections
+    };
+
     try {
-      await adminUpsertProduct(formData);
+      await adminUpsertProduct(payload);
       alert('保存しました');
       router.push('/admin/products');
     } catch (e: any) {
@@ -91,10 +127,10 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
     }
   };
 
-  // Helper for Number Inputs to avoid "011" issue
+  // Helper for Number Inputs
   const handleNumberChange = (field: keyof Product, val: string) => {
     if (val === '') {
-      // @ts-ignore - Temporary allowance for empty input while typing
+      // @ts-ignore 
       setFormData({ ...formData, [field]: '' });
       return;
     }
@@ -137,7 +173,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
             </select>
           </div>
           
-          {/* Slug & SKU with Auto-gen indication */}
+          {/* Slug & SKU */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">
               Slug (URL) <span className="text-red-500">*</span>
@@ -221,9 +257,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
               value={formData.stock_qty} 
               onChange={e => handleNumberChange('stock_qty', e.target.value)} 
             />
-            <p className="text-xs text-gray-500 mt-1">
-              ※ 半角数字のみ。0を入力すると在庫切れになります。
-            </p>
           </div>
         </div>
       </div>
@@ -239,16 +272,30 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       {/* Section 4: Details */}
       <div>
         <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b">詳細説明</h3>
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">短い説明 (一覧表示用)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">簡潔な説明 (ショート / 卖点)</label>
             <textarea 
-              className="input-base h-24 resize-y" 
-              placeholder="商品一覧や検索結果に表示される短い紹介文です。"
+              className="input-base h-20 resize-y" 
+              placeholder="商品一覧やタイトル直下に表示される短い紹介文です（1-3行程度）"
               value={formData.short_desc_jp || ''} 
               onChange={e => setFormData({...formData, short_desc_jp: e.target.value})} 
             />
           </div>
+          
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">詳細説明 (ロング)</label>
+            <textarea 
+              className="input-base h-40 resize-y" 
+              placeholder="商品の詳しい特徴、素材、サイズ感などを入力してください。"
+              value={longDescText} 
+              onChange={e => setLongDescText(e.target.value)} 
+            />
+            <p className="text-xs text-gray-400 mt-1">
+               ※ 簡易編集モード：画像や箇条書きを含む高度な編集はデータベース(JSON)を直接操作するか、将来のアップデートをお待ちください。
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">タグ (カンマ区切り)</label>
             <input 
@@ -263,7 +310,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       </div>
 
       {/* Footer Actions */}
-      <div className="pt-6 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white/90 backdrop-blur p-4 -mx-4 -mb-4 md:mb-0 md:static">
+      <div className="pt-6 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white/90 backdrop-blur p-4 -mx-4 -mb-4 md:mb-0 md:static z-20">
         <button 
           type="button" 
           onClick={() => router.back()} 

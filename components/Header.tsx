@@ -7,16 +7,19 @@ import { useUIStore } from '@/store/useUIStore';
 import { useCartStore } from '@/store/useCartStore';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 
-// 1. Logistics Bar Component
+// 1. Logistics Bar (Topmost)
 function LogisticsBar() {
   return (
-    <div className="bg-primary text-white text-[10px] md:text-xs py-2 overflow-hidden relative">
-      <div className="container-base flex items-center justify-start md:justify-center overflow-x-auto whitespace-nowrap scrollbar-hide gap-6 md:gap-8 px-4">
-        <span className="flex items-center gap-1">🇯🇵 全日本配送</span>
-        <span className="flex items-center gap-1">🚚 3日以内にお届け</span>
-        <span className="flex items-center gap-1">💰 代金引換対応</span>
-        <span className="flex items-center gap-1">✅ 安心の返品保証</span>
-        <span className="flex items-center gap-1">🍼 試用OK</span>
+    <div className="bg-gray-900 text-white text-[10px] md:text-xs py-2.5 overflow-hidden relative border-b border-gray-800">
+      <div className="container-base flex items-center justify-between px-4">
+         <div className="flex items-center gap-4 overflow-x-auto whitespace-nowrap scrollbar-hide flex-1">
+            <span className="flex items-center gap-1.5"><span className="text-green-400">●</span> 全日本配送</span>
+            <span className="flex items-center gap-1.5"><span className="text-green-400">●</span> 3日以内にお届け</span>
+            <span className="hidden md:flex items-center gap-1.5"><span className="text-green-400">●</span> 代金引換OK</span>
+         </div>
+         <div className="hidden md:block text-gray-400 text-[10px]">
+            10,000円以上で送料無料
+         </div>
       </div>
     </div>
   );
@@ -26,42 +29,22 @@ export default function Header() {
   const { openSearch, openCart } = useUIStore();
   const cartCount = useCartStore((state) => state.getCartCount());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  // Scroll detection for sticky styles
-  useEffect(() => {
-    const handleScroll = () => {
-      // 80px is approx where header would start disappearing, but we keep logistics longer
-      // Implementation: We make the whole container sticky, but hide the NAV part on deep scroll if desired.
-      // Current requirement: "Logistics bar disappears later than header".
-      // Simplified robust approach: Keep both sticky, but compress padding.
-      // Complex approach (as requested): Hide TopBar first.
-      
-      // Let's implement a clean sticky header that compresses.
-      setIsScrolled(window.scrollY > 40);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   return (
     <>
       {/* 
-         Sticky Container 
-         Top bar + Header stick together.
-         On scroll, we could hide Top Bar, but user requested specific behavior:
-         "Top bar disappears later than category row" -> implying importance.
-         We will keep both sticky for maximum visibility on this iteration.
+         Sticky Container Strategy:
+         We make the entire wrapper sticky. 
+         The LogisticsBar sits on top, followed by the Header.
+         This ensures the LogisticsBar stays visible as requested.
       */}
       <div className="sticky top-0 z-40 bg-white shadow-sm transition-all duration-300">
         
-        {/* Logistics Bar (Top) */}
-        <div className={`${isScrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-auto opacity-100'} transition-all duration-300 ease-in-out`}>
-           <LogisticsBar />
-        </div>
+        {/* 1. Logistics Bar (Always visible in this layout) */}
+        <LogisticsBar />
 
-        {/* Main Header */}
-        <header className="border-b border-gray-100">
+        {/* 2. Main Navigation */}
+        <header className="border-b border-gray-100 bg-white relative z-20">
           <div className="container-base flex items-center justify-between h-14 md:h-16">
             
             {/* Left: Hamburger (Mobile) */}
@@ -107,7 +90,7 @@ export default function Header() {
               >
                 <ShoppingBag size={22} strokeWidth={2} />
                 {cartCount > 0 && (
-                  <span className="absolute top-0.5 right-0 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1">
+                  <span className="absolute top-0.5 right-0 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 animate-in zoom-in">
                     {cartCount}
                   </span>
                 )}
@@ -115,8 +98,6 @@ export default function Header() {
             </div>
           </div>
         </header>
-
-        {/* Mobile Category Chips (Optional: Sticky sub-nav for mobile if needed, usually just in body) */}
       </div>
 
       {/* Mobile Menu Overlay */}
@@ -127,7 +108,7 @@ export default function Header() {
             onClick={() => setMobileMenuOpen(false)}
           />
           
-          <div className="relative w-[80%] max-w-sm bg-white h-full shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col">
+          <div className="relative w-[85%] max-w-sm bg-white h-full shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col">
             <div className="p-4 border-b flex items-center justify-between bg-gray-50">
               <span className="font-bold text-lg text-gray-800">メニュー</span>
               <button onClick={() => setMobileMenuOpen(false)} className="p-2 bg-white rounded-full shadow-sm">

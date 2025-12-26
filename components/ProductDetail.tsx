@@ -80,6 +80,9 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100) 
   : 0;
 
+  // RULE: Render short_desc_jp if available, otherwise fallback to description
+  const shortDescription = product.short_desc_jp || product.description;
+
   return (
     <div className="grid md:grid-cols-2 gap-8 lg:gap-12 pb-4 md:pb-0">
       
@@ -165,11 +168,11 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           )}
         </div>
 
-        {/* Short Description (Key Selling Points) - Enhanced Typography */}
-        {product.short_desc_jp && (
+        {/* Short Description (Key Selling Points) - With Fallback Logic */}
+        {shortDescription && (
           <div className="mb-6">
-             <p className="text-base text-gray-700 font-medium leading-relaxed">
-                {product.short_desc_jp}
+             <p className="text-base text-gray-700 font-medium leading-relaxed whitespace-pre-wrap">
+                {shortDescription}
              </p>
           </div>
         )}
@@ -274,8 +277,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
            </div>
         )}
 
-        {/* Shipping Note (Optimized for Mobile Space) */}
-        {/* Changed from Vertical List to Horizontal Grid/Flex to save vertical space */}
+        {/* Shipping Note */}
         <div className="mt-6 md:mt-8 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
            <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-1">
              <div className="flex items-center gap-1.5 w-[48%]">

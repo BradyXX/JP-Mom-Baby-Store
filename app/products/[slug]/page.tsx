@@ -7,6 +7,10 @@ import Accordion from "@/components/Accordion";
 import Carousel from "@/components/Carousel";
 import ProductCard from "@/components/ProductCard";
 
+// Force dynamic to ensure we always fetch fresh data from DB, avoiding stale cache issues
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface DescriptionSection {
   type: 'text' | 'image' | 'bullets';
   content?: string;
@@ -15,14 +19,20 @@ interface DescriptionSection {
 }
 
 export default async function ProductPage({ params }: { params: { slug: string } }) {
-  const product = await getProductBySlug(params.slug);
+  // 1. Decode URL slug to handle Japanese characters correctly
+  const decodedSlug = decodeURIComponent(params.slug);
 
+  // 2. Fetch product strictly by slug
+  const product = await getProductBySlug(decodedSlug);
+
+  // 3. Strict 404 if not found (no fallback to default/first product)
   if (!product) return notFound();
 
   // Fetch Recommended Products
   const recommended = await listProductsByIds(product.recommended_product_ids || []);
 
-  // Parse Long Description
+  // Parse Long Description (JSON)
+  // Logic: Only use long_desc_sections. Do NOT fallback to 'description' here.
   const descriptionSections = Array.isArray(product.long_desc_sections)
     ? (product.long_desc_sections as unknown as DescriptionSection[])
     : [];

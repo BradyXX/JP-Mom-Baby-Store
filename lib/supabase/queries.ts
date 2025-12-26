@@ -144,14 +144,25 @@ export async function listProductsByCollection(handle: string, options: ProductL
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   try {
+    // USE .single() INSTEAD OF .maybeSingle() for stricter matching
+    // If slug is not unique (which shouldn't happen), .single() throws an error, which is better than returning a random row.
+    // If slug is not found, it returns error code PGRST116.
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('slug', slug)
-      .maybeSingle();
-    if (error) return null;
+      .single();
+
+    if (error) {
+      // PGRST116: The result contains 0 rows
+      if (error.code !== 'PGRST116') {
+        console.error("Error fetching product by slug:", slug, error);
+      }
+      return null;
+    }
     return data;
-  } catch {
+  } catch (e) {
+    console.error("Exception fetching product by slug:", slug, e);
     return null;
   }
 }

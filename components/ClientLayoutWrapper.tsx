@@ -1,4 +1,3 @@
-
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -7,6 +6,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import SearchDrawer from "@/components/drawers/SearchDrawer";
 import CartDrawer from "@/components/drawers/CartDrawer";
+import CategoryDrawer from "@/components/drawers/CategoryDrawer";
 import CookieConsent from "@/components/CookieConsent";
 import MobileBottomNav from "@/components/MobileBottomNav";
 
@@ -29,6 +29,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
       <Footer />
       <SearchDrawer />
       <CartDrawer />
+      <CategoryDrawer />
       <CookieConsent />
       <MobileBottomNav />
     </>

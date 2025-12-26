@@ -3,18 +3,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, MessageCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, MessageCircle, AlertCircle } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { getSettings } from '@/lib/supabase/queries';
 import { supabase } from '@/lib/supabase/client';
 import { AppSettings } from '@/lib/supabase/types';
 import { getUtmParams } from '@/lib/utils/utm';
-import { 
-  formatShortLineMessage, 
-  getLineOrderLink,
-  getRotatedLineOA, 
-  normalizeHandle 
-} from '@/lib/utils/line';
+import { getRotatedLineOA, normalizeHandle } from '@/lib/utils/line';
 
 const PREFECTURES = ["北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群马県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋贺県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"];
 
@@ -24,11 +19,6 @@ export default function CheckoutClient() {
   const { items, getCartTotal, clearCart } = useCartStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [orderSaved, setOrderSaved] = useState(false);
-  const [orderNo, setOrderNo] = useState('');
-  
-  // 这里保存最终选定的 Handle
-  const [oaHandle, setOaHandle] = useState('');
   
   const [settings, setSettings] = useState<AppSettings | null>(null);
 
@@ -55,19 +45,17 @@ export default function CheckoutClient() {
       // 1. 获取最新设置
       const currentSettings = await getSettings();
       
-      // 2. 使用轮询函数选择 OA (现在传入 string[])
+      // 2. 使用轮询函数选择 OA (Raw String)
       const rawHandle = getRotatedLineOA(currentSettings.line_oas);
       
       // 3. 规范化 Handle (确保有 @)
       const finalHandle = normalizeHandle(rawHandle);
-      setOaHandle(finalHandle);
 
       if (!finalHandle && currentSettings.line_enabled) {
-        console.warn("No active LINE OA found, but LINE is enabled. Check Admin Settings.");
+        console.warn("No active LINE OA found, check Admin Settings.");
       }
 
       const newOrderNo = `ORD-${Date.now().toString().slice(-8)}`;
-      setOrderNo(newOrderNo);
 
       const payload = {
         order_no: newOrderNo,
@@ -83,63 +71,29 @@ export default function CheckoutClient() {
         subtotal,
         shipping_fee: shippingFee,
         total,
-        payment_method: 'COD',
-        status: 'new',
-        line_oa_handle: finalHandle, // 保存选定的 Handle 到数据库
-        utm: getUtmParams(searchParams)
+        payment_method: 'COD' as const,
+        status: 'new' as const,
+        line_oa_handle: finalHandle, // 保存选定的 Handle
+        utm: getUtmParams(searchParams),
+        line_confirmed: false
       };
 
+      // 4. 写入数据库
       const { error: insErr } = await supabase.from('orders').insert(payload);
       if (insErr) throw insErr;
 
+      // 5. 保存 SessionStorage (用于 Success 页面快速读取)
       sessionStorage.setItem('last_order', JSON.stringify(payload));
+      
+      // 6. 清空购物车并跳转
       clearCart();
-      setOrderSaved(true);
-      setIsSubmitting(false);
+      router.push(`/order-success?order_no=${newOrderNo}`);
+      
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "注文の保存に失敗しました。");
       setIsSubmitting(false);
     }
   };
-
-  const handleLineJump = () => {
-    const orderData = JSON.parse(sessionStorage.getItem('last_order') || '{}');
-    const msg = formatShortLineMessage(orderData);
-    
-    // 使用已保存的 oaHandle 生成链接
-    const lineUrl = getLineOrderLink(oaHandle, msg);
-    
-    // Universal Link 直接跳转
-    window.location.href = lineUrl;
-    
-    setTimeout(() => {
-      router.push(`/order-success?order_no=${orderNo}`);
-    }, 1000);
-  };
-
-  if (orderSaved) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center animate-in zoom-in duration-300">
-          <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 size={32} />
-          </div>
-          <h2 className="text-xl font-bold mb-3">注文を保存しました</h2>
-          <p className="text-sm text-gray-500 mb-8 leading-relaxed">
-            最後の手続きです。<br />
-            下のボタンを押してLINEで注文を確定させてください。
-          </p>
-          <button 
-            onClick={handleLineJump} 
-            className="w-full py-4 bg-[#06C755] text-white rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
-          >
-            <MessageCircle size={24} />
-            LINEで確定する
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="container-base py-8 md:py-12 max-w-4xl">

@@ -22,7 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       // 1. Get Current User
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await (supabase.auth as any).getUser();
       
       if (authError || !user) {
         router.push('/admin/login');
@@ -39,7 +39,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       // 3. Check permission
       if (!adminUser) {
         alert('管理者権限がありません');
-        await supabase.auth.signOut();
+        await (supabase.auth as any).signOut();
         router.push('/admin/login');
         return;
       }

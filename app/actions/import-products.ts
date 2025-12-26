@@ -106,7 +106,9 @@ export async function processImportBatch(
 ): Promise<ImportResult> {
   const rowResults: ImportResult['rowResults'] = [];
 
-  for (const [idx, row] of rows.entries()) {
+  // FIXED: Use standard for-loop instead of .entries() iterator to avoid TypeScript downlevelIteration error
+  for (let idx = 0; idx < rows.length; idx++) {
+    const row = rows[idx];
     const rowTitle = row[Object.keys(row).find(k => mapping[k] === 'title_jp') || ''] || 'Unknown Product';
     
     try {

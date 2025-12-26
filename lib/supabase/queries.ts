@@ -16,35 +16,27 @@ export interface ProductListOptions {
 // --- Settings ---
 
 export async function getSettings(): Promise<AppSettings> {
+  // FIXED: Changed table name to 'app_settings' and force id=1
   const { data, error } = await supabase
-    .from('settings')
+    .from('app_settings')
     .select('*')
+    .eq('id', 1)
     .single();
   
   if (error) {
-    // Return default settings if table is empty or missing
-    return {
-      id: 1,
-      shop_name: 'MOM&BABY Japan',
-      banner_text: 'やさしさを、かたちに。',
-      hero_slides: [],
-      whatsapp_numbers: [],
-      currency: 'JPY',
-      free_shipping_threshold: 10000,
-      global_coupon_code: null,
-      line_enabled: true,
-      line_oas: [], // Default to empty string array
-      line_rr_index: 0
-    };
+    console.error("Error fetching settings (app_settings):", error);
+    throw error; // Throw error to let UI handle it, do not return default silently
   }
   return data;
 }
 
 export async function adminUpdateSettings(settings: Partial<AppSettings>) {
+  // FIXED: Changed table name to 'app_settings' and force id=1
   const { data, error } = await supabase
-    .from('settings')
+    .from('app_settings')
     .update(settings)
-    .eq('id', settings.id);
+    .eq('id', 1);
+    
   if (error) throw error;
   return data;
 }

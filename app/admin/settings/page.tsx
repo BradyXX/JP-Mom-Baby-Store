@@ -3,22 +3,25 @@
 import { useEffect, useState } from 'react';
 import { getSettings, adminUpdateSettings } from '@/lib/supabase/queries';
 import { AppSettings } from '@/lib/supabase/types';
-import { Save, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { Save, Plus, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import ImageUploader from '@/components/admin/ImageUploader';
 import { normalizeHandle } from '@/lib/utils/line';
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getSettings()
       .then(data => {
         setSettings(data);
         setLoading(false);
+        setError(null);
       })
       .catch(e => {
-        alert('Failed to load settings');
+        console.error(e);
+        setError(e.message || '設定の読み込みに失敗しました（テーブル名/RLS確認）');
         setLoading(false);
       });
   }, []);
@@ -40,12 +43,28 @@ export default function AdminSettingsPage() {
       await adminUpdateSettings(newSettings);
       setSettings(newSettings); // 更新本地状态以反映清洗后的值
       alert('設定を保存しました');
-    } catch (e) {
-      alert('保存に失敗しました');
+    } catch (e: any) {
+      alert('保存に失敗しました: ' + e.message);
     }
   };
 
-  if (loading || !settings) return <div className="p-8">Loading...</div>;
+  if (loading) return <div className="p-8">Loading...</div>;
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center gap-3">
+          <AlertTriangle size={24} />
+          <div>
+            <p className="font-bold">エラーが発生しました</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!settings) return <div className="p-8">No data found.</div>;
 
   // 确保类型安全
   const slides = (Array.isArray(settings.hero_slides) ? settings.hero_slides : []) as any[];

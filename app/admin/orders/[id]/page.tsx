@@ -6,6 +6,24 @@ import { Order, OrderItem } from '@/lib/supabase/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
+// Type Guard: Validate if a Json object matches the OrderItem interface
+function isValidOrderItem(item: unknown): item is OrderItem {
+  if (typeof item !== 'object' || item === null) return false;
+  
+  const i = item as Record<string, unknown>;
+  
+  // Validate essential fields used in the UI and calculations
+  // We use loose validation (truthy check for title) to be robust against partial data
+  // but strict check for numbers to prevent NaN in calculations
+  return (
+    typeof i.title === 'string' &&
+    typeof i.price === 'number' &&
+    typeof i.qty === 'number'
+    // Optional fields like image, sku, variant are not strictly required for the type guard to pass,
+    // as they can be undefined in the interface or handled by the UI.
+  );
+}
+
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
@@ -39,9 +57,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   if (loading || !order) return <Loader2 className="animate-spin" />;
 
-  // FIX: Safely extract items from Json type
-  // This prevents "order.items is possibly null" error during build
-  const items = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
+  // FIX: Strictly typed extraction using Type Guard
+  // 1. Ensure order.items is an array
+  // 2. Filter using isValidOrderItem predicate to narrow type to OrderItem[]
+  const rawItems = Array.isArray(order.items) ? order.items : [];
+  const items: OrderItem[] = rawItems.filter(isValidOrderItem);
 
   return (
     <div className="max-w-4xl">
@@ -129,7 +149,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               </tr>
            </thead>
            <tbody className="divide-y">
-              {/* FIX: Handle empty items safely */}
+              {/* items is now guaranteed to be OrderItem[] */}
               {items.length === 0 ? (
                  <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">

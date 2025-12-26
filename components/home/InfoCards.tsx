@@ -40,18 +40,20 @@ export default function InfoCards({ lineUrl }: InfoCardsProps) {
         <Link 
            href={lineUrl}
            target="_blank"
-           className="w-full h-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-3 hover:shadow-md transition-shadow active:scale-[0.98] group"
+           className="w-full h-full bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2 md:gap-3 hover:shadow-md transition-shadow active:scale-[0.98] group"
         >
-          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-1">
-            <Headphones size={32} />
+          {/* Reduced icon size for mobile */}
+          <div className="w-10 h-10 md:w-16 md:h-16 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-1">
+            <Headphones size={20} className="md:hidden" />
+            <Headphones size={32} className="hidden md:block" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-800 text-lg mb-1">迅速対応</h3>
-            <span className="text-sm font-bold text-green-600 inline-block mb-2">
+            <h3 className="font-bold text-gray-800 text-sm md:text-lg mb-0.5 md:mb-1">迅速対応</h3>
+            <span className="text-xs md:text-sm font-bold text-green-600 inline-block mb-1 md:mb-2">
               LINE：公式サポート
             </span>
-            <p className="text-xs text-gray-500 leading-relaxed px-2">
-              育児中でもスキマ時間に相談OK。<br/>スタッフが迅速に対応します。
+            <p className="text-[10px] md:text-xs text-gray-500 leading-tight md:leading-relaxed px-1">
+              育児中でもスキマ時間に相談OK。<br className="hidden md:block"/>スタッフが迅速に対応します。
             </p>
           </div>
         </Link>
@@ -59,15 +61,15 @@ export default function InfoCards({ lineUrl }: InfoCardsProps) {
     }
     if (type === 'quality') {
       return (
-        <div className="w-full h-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-3">
-          <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 mb-1">
-            <ShieldCheck size={32} />
+        <div className="w-full h-full bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2 md:gap-3">
+          <div className="w-10 h-10 md:w-16 md:h-16 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 mb-1">
+            <ShieldCheck size={20} className="md:hidden" />
+            <ShieldCheck size={32} className="hidden md:block" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-800 text-lg mb-1">高品質へのこだわり</h3>
-            <div className="h-4 md:mb-1" />
-            <p className="text-xs text-gray-500 leading-relaxed px-2">
-              ママ目線で厳選。<br/>安心して使える品質をお届けします。
+            <h3 className="font-bold text-gray-800 text-sm md:text-lg mb-0.5 md:mb-1">品質へのこだわり</h3>
+            <p className="text-[10px] md:text-xs text-gray-500 leading-tight md:leading-relaxed px-1 mt-1">
+              ママ目線で厳選。<br className="hidden md:block"/>安心して使える品質をお届けします。
             </p>
           </div>
         </div>
@@ -75,15 +77,15 @@ export default function InfoCards({ lineUrl }: InfoCardsProps) {
     }
     // delivery
     return (
-      <div className="w-full h-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-3">
-        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-1">
-          <Truck size={32} />
+      <div className="w-full h-full bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2 md:gap-3">
+        <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-1">
+          <Truck size={20} className="md:hidden" />
+          <Truck size={32} className="hidden md:block" />
         </div>
         <div>
-          <h3 className="font-bold text-gray-800 text-lg mb-1">スピード配送</h3>
-          <div className="h-4 md:mb-1" />
-          <p className="text-xs text-gray-500 leading-relaxed px-2">
-            日本国内発送。<br/>ご注文から最短3日でお届けします。
+          <h3 className="font-bold text-gray-800 text-sm md:text-lg mb-0.5 md:mb-1">スピード配送</h3>
+          <p className="text-[10px] md:text-xs text-gray-500 leading-tight md:leading-relaxed px-1 mt-1">
+            日本国内発送。<br className="hidden md:block"/>ご注文から最短3日でお届け。
           </p>
         </div>
       </div>
@@ -91,36 +93,42 @@ export default function InfoCards({ lineUrl }: InfoCardsProps) {
   };
 
   return (
-    <section className="container-base mt-6 md:mt-8">
+    <section className="container-base mt-4 md:mt-8">
       
-      {/* Mobile: Horizontal Snap Carousel (1 Card View) */}
+      {/* Mobile: Horizontal Snap Carousel (1 Card View, Compact Height) */}
       <div className="md:hidden relative">
         <div 
           ref={scrollRef}
-          className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4"
+          className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0"
         >
           {/* Card 1 */}
-          <div className="w-full flex-shrink-0 snap-center">
-             <CardContent type="support" />
+          <div className="w-full flex-shrink-0 snap-center px-1">
+             <div className="h-[140px]">
+                <CardContent type="support" />
+             </div>
           </div>
           {/* Card 2 */}
-          <div className="w-full flex-shrink-0 snap-center">
-             <CardContent type="quality" />
+          <div className="w-full flex-shrink-0 snap-center px-1">
+             <div className="h-[140px]">
+                <CardContent type="quality" />
+             </div>
           </div>
           {/* Card 3 */}
-          <div className="w-full flex-shrink-0 snap-center">
-             <CardContent type="delivery" />
+          <div className="w-full flex-shrink-0 snap-center px-1">
+             <div className="h-[140px]">
+                <CardContent type="delivery" />
+             </div>
           </div>
         </div>
         
         {/* Pagination Dots */}
-        <div className="flex justify-center gap-2 mt-1">
+        <div className="flex justify-center gap-2 mt-3">
           {[0, 1, 2].map((idx) => (
             <button
               key={idx}
               onClick={() => scrollTo(idx)}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                activeIndex === idx ? 'bg-primary w-6' : 'bg-gray-200 w-2'
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                activeIndex === idx ? 'bg-primary w-4' : 'bg-gray-200 w-1.5'
               }`}
               aria-label={`Go to slide ${idx + 1}`}
             />
@@ -128,7 +136,7 @@ export default function InfoCards({ lineUrl }: InfoCardsProps) {
         </div>
       </div>
 
-      {/* Desktop: 3 Column Grid */}
+      {/* Desktop: 3 Column Grid (Unchanged) */}
       <div className="hidden md:grid md:grid-cols-3 gap-6">
         <CardContent type="support" />
         <CardContent type="quality" />

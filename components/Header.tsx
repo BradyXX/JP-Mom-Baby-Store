@@ -1,8 +1,7 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, ShoppingBag, Menu, X } from 'lucide-react';
+import { Search, ShoppingBag, Menu, X, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@/store/useUIStore';
 import { useCartStore } from '@/store/useCartStore';
 import { SHOP_CATEGORIES } from '@/lib/categories';
@@ -14,7 +13,7 @@ function LogisticsBar() {
     <div className="bg-gray-900 text-white text-[10px] font-medium py-2.5 relative z-50 border-b border-gray-800 transition-colors">
       <div className="container-base flex flex-wrap items-center justify-center md:justify-between gap-x-4 gap-y-1 px-4 leading-none">
          
-         {/* Left: Primary Value Prop (From old TopBar) */}
+         {/* Left: Primary Value Prop */}
          <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
             <span className="font-bold tracking-wide">全品送料無料・日本国内発送</span>
@@ -90,7 +89,7 @@ export default function Header() {
               MOM<span className="text-accent">&</span>BABY
             </Link>
 
-            {/* Center: Desktop Nav (Hide text on scroll to clean up view if very dense, but standard is keeping it) */}
+            {/* Center: Desktop Nav */}
             <nav className={`hidden lg:flex items-center space-x-6 mx-8 transition-opacity duration-300 ${
               isScrolled ? 'opacity-90' : 'opacity-100'
             }`}>
@@ -140,27 +139,59 @@ export default function Header() {
           />
           
           <div className="relative w-[85%] max-w-sm bg-white h-full shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col">
-            <div className="p-4 border-b flex items-center justify-between bg-gray-50">
-              <span className="font-bold text-lg text-gray-800">メニュー</span>
-              <button onClick={() => setMobileMenuOpen(false)} className="p-2 bg-white rounded-full shadow-sm">
-                <X size={20} />
+            {/* Optimized Header Height */}
+            <div className="px-4 py-3 border-b flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                 <span className="font-black text-lg text-primary">MOM<span className="text-accent">&</span>BABY</span>
+              </div>
+              <button 
+                onClick={() => setMobileMenuOpen(false)} 
+                className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-100 active:scale-95 transition-all"
+              >
+                <X size={18} />
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto py-2">
-              {SHOP_CATEGORIES.map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={`/collections/${cat.handle}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-4 px-6 py-4 border-b border-gray-100 active:bg-gray-50"
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${cat.color || 'bg-gray-100'}`}>
-                      <CategoryIcon name={cat.iconName} size={16} />
-                  </div>
-                  <span className="font-medium text-gray-700">{cat.name}</span>
-                </Link>
-              ))}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto pb-safe">
+              <div className="py-2">
+                {SHOP_CATEGORIES.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={`/collections/${cat.handle}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-5 py-4 border-b border-gray-50 hover:bg-gray-50 active:bg-gray-100 transition-colors group"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Unified Icon Style: Rounded Full, Light Background */}
+                      <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${cat.color || 'bg-gray-100'}`}>
+                          <CategoryIcon name={cat.iconName} size={18} className="opacity-80 group-hover:opacity-100" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-base text-gray-800">{cat.name}</span>
+                        <span className="text-[10px] text-gray-400 font-medium tracking-wide uppercase">{cat.subTitle}</span>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-gray-300 group-hover:text-primary" />
+                  </Link>
+                ))}
+              </div>
+
+              {/* Footer Links in Menu */}
+              <div className="mt-4 p-5 bg-gray-50 border-t border-gray-100">
+                 <div className="grid grid-cols-2 gap-3 mb-6">
+                    <Link href="/collections/all" onClick={() => setMobileMenuOpen(false)} className="btn-secondary text-xs py-3 text-center bg-white shadow-sm border-transparent">全商品</Link>
+                    <Link href="/collections/sale" onClick={() => setMobileMenuOpen(false)} className="btn-secondary text-xs py-3 text-center bg-white text-red-600 shadow-sm border-transparent">セール</Link>
+                 </div>
+                 <div className="space-y-3">
+                    <Link href="#" className="flex items-center gap-3 text-sm text-gray-600 hover:text-primary">
+                       <span>ご利用ガイド</span>
+                    </Link>
+                    <Link href="#" className="flex items-center gap-3 text-sm text-gray-600 hover:text-primary">
+                       <span>お問い合わせ</span>
+                    </Link>
+                 </div>
+              </div>
             </div>
           </div>
         </div>

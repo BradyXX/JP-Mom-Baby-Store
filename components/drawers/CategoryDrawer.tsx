@@ -18,9 +18,7 @@ export default function CategoryDrawer() {
         />
       )}
 
-      {/* Drawer - Slide from Left (Standard Mobile Menu feel) or Bottom (Sheet)
-          Let's use Bottom Sheet style as per request for "Category Panel"
-      */}
+      {/* Drawer - Bottom Sheet Style */}
       <div
         className={`fixed inset-x-0 bottom-0 z-50 w-full bg-white shadow-2xl rounded-t-2xl transform transition-transform duration-300 ease-out flex flex-col max-h-[85vh] ${
           isCategoryOpen ? 'translate-y-0' : 'translate-y-full'
@@ -30,7 +28,7 @@ export default function CategoryDrawer() {
         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white rounded-t-2xl relative">
           <div className="w-10" /> {/* Spacer for centering */}
           <h2 className="text-lg font-bold">カテゴリー</h2>
-          <button onClick={closeCategory} className="p-2 hover:bg-gray-100 rounded-full">
+          <button onClick={closeCategory} className="p-2 hover:bg-gray-100 rounded-full active:bg-gray-200 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -43,28 +41,29 @@ export default function CategoryDrawer() {
                   key={cat.id}
                   href={`/collections/${cat.handle}`}
                   onClick={closeCategory}
-                  className="flex items-center justify-between px-4 py-4 border-b border-gray-50 active:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between px-4 py-4 border-b border-gray-50 active:bg-gray-50 transition-colors group"
                 >
                   <div className="flex items-center gap-4">
+                      {/* Unified Icon Style: Rounded Full, Light Background (Same as Header) */}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${cat.color || 'bg-gray-100'}`}>
-                          <CategoryIcon name={cat.iconName} size={18} />
+                          <CategoryIcon name={cat.iconName} size={18} className="opacity-80 group-hover:opacity-100"/>
                       </div>
                       <div className="flex flex-col">
                          <span className="font-bold text-gray-800 text-sm">{cat.name}</span>
                          <span className="text-[10px] text-gray-400 uppercase tracking-wider">{cat.subTitle}</span>
                       </div>
                   </div>
-                  <ChevronRight size={16} className="text-gray-300" />
+                  <ChevronRight size={16} className="text-gray-300 group-hover:text-primary" />
                 </Link>
              ))}
           </div>
           
           {/* Quick Links Footer */}
           <div className="mt-4 p-4 grid grid-cols-2 gap-3">
-             <Link href="/collections/all" onClick={closeCategory} className="bg-gray-50 py-3 rounded-lg text-center text-xs font-bold text-gray-600 border border-gray-100">
+             <Link href="/collections/all" onClick={closeCategory} className="bg-gray-50 py-3 rounded-lg text-center text-xs font-bold text-gray-600 border border-gray-100 active:bg-gray-100">
                 全ての商品
              </Link>
-             <Link href="/collections/sale" onClick={closeCategory} className="bg-red-50 py-3 rounded-lg text-center text-xs font-bold text-red-600 border border-red-100">
+             <Link href="/collections/sale" onClick={closeCategory} className="bg-red-50 py-3 rounded-lg text-center text-xs font-bold text-red-600 border border-red-100 active:bg-red-100">
                 セール会場
              </Link>
           </div>

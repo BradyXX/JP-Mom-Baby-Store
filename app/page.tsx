@@ -6,6 +6,7 @@ import Newsletter from "@/components/Newsletter";
 import { SHOP_CATEGORIES } from "@/lib/categories";
 import HomeHero from '@/components/home/HomeHero';
 import CategorySection from '@/components/home/CategorySection';
+import CategoryIcon from '@/components/CategoryIcon';
 
 // IMPORTANT: Disable cache to ensure homepage is always fresh
 export const revalidate = 0; 
@@ -100,7 +101,7 @@ export default async function Home() {
                 className="flex flex-col items-center gap-2 min-w-[72px] snap-start group cursor-pointer"
               >
                 <div className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shadow-sm border border-gray-100 group-hover:shadow-md group-hover:scale-105 transition-all ${cat.color || 'bg-gray-100 text-gray-600'}`}>
-                  {cat.icon && <cat.icon size={24} strokeWidth={1.5} />}
+                  <CategoryIcon name={cat.iconName} size={24} strokeWidth={1.5} />
                 </div>
                 <span className="text-[10px] md:text-xs font-bold text-gray-600 text-center leading-tight line-clamp-1 w-full px-1 group-hover:text-primary">
                   {cat.name}

@@ -1,11 +1,12 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Search, ShoppingBag, Menu, X } from 'lucide-react';
 import { useUIStore } from '@/store/useUIStore';
 import { useCartStore } from '@/store/useCartStore';
 import { SHOP_CATEGORIES } from '@/lib/categories';
+import CategoryIcon from '@/components/CategoryIcon';
 
 // 1. Logistics Bar (Topmost)
 function LogisticsBar() {
@@ -125,7 +126,7 @@ export default function Header() {
                   className="flex items-center gap-4 px-6 py-4 border-b border-gray-100 active:bg-gray-50"
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${cat.color || 'bg-gray-100'}`}>
-                      {cat.icon && <cat.icon size={16} />}
+                      <CategoryIcon name={cat.iconName} size={16} />
                   </div>
                   <span className="font-medium text-gray-700">{cat.name}</span>
                 </Link>

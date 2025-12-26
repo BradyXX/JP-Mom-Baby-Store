@@ -1,69 +1,120 @@
 
 'use client';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { AppSettings } from '@/lib/supabase/types';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface HomeHeroProps {
-  settings: AppSettings;
+interface Slide {
+  image_url: string;
+  link?: string;
+  alt?: string;
 }
 
-export default function HomeHero({ settings }: HomeHeroProps) {
-  // 1. Safe extraction of slides
-  const slides = (Array.isArray(settings.hero_slides) 
-    ? settings.hero_slides 
-    : []) as { image_url: string; link?: string; alt?: string }[];
+interface HomeHeroProps {
+  slides: Slide[];
+}
 
-  // 2. Strict validation: Must be string AND not empty
-  const rawImage = slides[0]?.image_url;
-  const isValidImage = typeof rawImage === 'string' && rawImage.trim().length > 0;
+export default function HomeHero({ slides }: HomeHeroProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
 
-  // 3. Fallback UI (No next/image) to prevent Server Exception
-  if (!isValidImage) {
+  // Fallback if no slides or empty array
+  const validSlides = slides.filter(s => s.image_url && s.image_url.trim() !== '');
+
+  // Auto-play logic
+  useEffect(() => {
+    if (validSlides.length <= 1 || isHovered) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % validSlides.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [validSlides.length, isHovered]);
+
+  const prevSlide = () => {
+    setCurrentIndex((prev) => (prev - 1 + validSlides.length) % validSlides.length);
+  };
+
+  const nextSlide = () => {
+    setCurrentIndex((prev) => (prev + 1) % validSlides.length);
+  };
+
+  // Render Fallback if absolutely no images
+  if (validSlides.length === 0) {
     return (
-        <section className="relative w-full h-[60vh] max-h-[500px] bg-gray-100 flex flex-col items-center justify-center text-center p-6 border-b border-gray-200">
-            <h2 className="text-3xl font-black text-gray-300 mb-2 tracking-widest uppercase">
-              {settings.shop_name || 'MOM & BABY'}
-            </h2>
-            <p className="text-gray-400 text-sm font-medium">Welcome to our store</p>
-        </section>
+      <section className="container-base mt-4 md:mt-6">
+        <div className="w-full h-[40vh] md:h-[450px] bg-gray-100 rounded-3xl flex flex-col items-center justify-center text-center p-6 border border-gray-200">
+           <h2 className="text-2xl font-black text-gray-300 tracking-widest uppercase">MOM & BABY</h2>
+           <p className="text-gray-400 text-sm font-medium mt-2">Welcome to our store</p>
+        </div>
+      </section>
     );
   }
 
-  // 4. Safe Render with Correct Aspect Ratios
   return (
-    <section className="relative w-full overflow-hidden">
-      {/* 
-         Requirement: Mobile ~60vh (4:5 feel), Desktop ~70vh
-      */}
-      <div className="relative w-full h-[60vh] md:h-[70vh] max-h-[800px] bg-gray-200">
-        <Image 
-          src={rawImage} 
-          alt={slides[0]?.alt || 'Hero Image'} 
-          fill 
-          priority
-          sizes="100vw"
-          className="object-cover object-center"
-        />
-        
-        {/* Text Overlay - Bottom Left aligned */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end">
-           <div className="container-base w-full pb-16 md:pb-24 pl-6 md:pl-12">
-              <div className="max-w-lg text-white drop-shadow-lg animate-in slide-in-from-bottom-4 duration-700">
-                <h2 className="text-3xl md:text-5xl font-extrabold mb-6 leading-tight whitespace-pre-line">
-                  {settings.banner_text || '赤ちゃんとママの\n毎日を笑顔に'}
-                </h2>
-                {slides[0]?.link && (
-                  <Link 
-                    href={slides[0].link} 
-                    className="inline-block bg-white text-gray-900 px-8 py-4 rounded-full font-bold text-sm md:text-base hover:bg-gray-100 transition-transform active:scale-95 shadow-md"
-                  >
-                    今すぐチェック
-                  </Link>
-                )}
-              </div>
-           </div>
+    <section className="container-base mt-4 md:mt-6">
+      <div 
+        className="relative w-full h-[50vh] md:h-[480px] bg-gray-100 rounded-3xl overflow-hidden shadow-sm group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Slides Container */}
+        <div 
+          className="flex h-full transition-transform duration-500 ease-out"
+          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+        >
+          {validSlides.map((slide, index) => (
+            <div key={index} className="relative w-full h-full flex-shrink-0">
+               <Image 
+                src={slide.image_url} 
+                alt={slide.alt || 'Banner'} 
+                fill 
+                priority={index === 0}
+                sizes="(max-width: 768px) 100vw, 1200px"
+                className="object-cover object-center"
+              />
+              {/* Optional: Text Overlay only if link exists to indicate clickability */}
+              {slide.link && (
+                 <Link href={slide.link} className="absolute inset-0 z-10" aria-label={slide.alt || "Banner link"} />
+              )}
+            </div>
+          ))}
         </div>
+
+        {/* Controls (Only if > 1 slide) */}
+        {validSlides.length > 1 && (
+          <>
+            {/* Arrows */}
+            <button 
+              onClick={(e) => { e.stopPropagation(); prevSlide(); }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-md backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-20"
+              aria-label="Previous slide"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); nextSlide(); }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-md backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-20"
+              aria-label="Next slide"
+            >
+              <ChevronRight size={20} />
+            </button>
+
+            {/* Dots */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+              {validSlides.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    currentIndex === idx ? 'bg-white w-6' : 'bg-white/50 hover:bg-white/80'
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

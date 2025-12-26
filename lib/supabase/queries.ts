@@ -13,40 +13,59 @@ export interface ProductListOptions {
   priceMax?: number;
 }
 
+// --- Default Fallbacks ---
+
+const DEFAULT_SETTINGS: AppSettings = {
+  id: 0,
+  shop_name: "MOM&BABY Japan",
+  banner_text: "赤ちゃんとママの\n毎日を笑顔に",
+  hero_slides: [], // Empty slides will trigger default Hero UI
+  currency: "JPY",
+  free_shipping_threshold: 10000,
+  global_coupon_code: null,
+  line_enabled: false,
+  line_rr_index: 0,
+  line_oas: []
+};
+
 // --- Settings ---
 
 export async function getSettings(): Promise<AppSettings> {
-  // AUDIT FIX: 
-  // 1. Table must be 'app_settings'.
-  // 2. Do not rely on 'id=1'. Use 'singleton=true' OR just limit(1) to be safe.
-  // 3. Return a clean object to avoid frontend crashes.
-  
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('*')
-    // We try to find the row marked as singleton, or fallback to the first row found.
-    .order('id', { ascending: true }) 
-    .limit(1)
-    .single();
-  
-  if (error) {
-    console.error("CRITICAL: Failed to fetch from 'app_settings'. Check Table Name & RLS.", error);
-    throw error;
-  }
-  
-  if (!data) {
-    throw new Error("No settings found in 'app_settings' table.");
-  }
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('*')
+      // We try to find the row marked as singleton, or fallback to the first row found.
+      .order('id', { ascending: true }) 
+      .limit(1)
+      .maybeSingle(); // Use maybeSingle to avoid error on empty table
+    
+    if (error) {
+      console.warn("Supabase fetch error (using defaults):", error.message);
+      return DEFAULT_SETTINGS;
+    }
+    
+    if (!data) {
+      console.warn("No settings found in 'app_settings' (using defaults).");
+      return DEFAULT_SETTINGS;
+    }
 
-  return data;
+    return data;
+  } catch (e) {
+    console.error("Critical error in getSettings (using defaults):", e);
+    return DEFAULT_SETTINGS;
+  }
 }
 
 export async function adminUpdateSettings(settings: Partial<AppSettings>) {
-  // AUDIT FIX: Ensure we update the correct row.
-  // First, get the ID of the current singleton row.
   const current = await getSettings();
   
-  if (!current?.id) throw new Error("Cannot update settings: No existing row found.");
+  // If we are using defaults (id=0), we might need to insert a row first
+  if (current.id === 0) {
+     const { data, error } = await supabase.from('app_settings').insert(settings).select().single();
+     if (error) throw error;
+     return data;
+  }
 
   const { data, error } = await supabase
     .from('app_settings')
@@ -62,127 +81,146 @@ export async function adminUpdateSettings(settings: Partial<AppSettings>) {
 // --- Products ---
 
 export async function listProductsByCollection(handle: string, options: ProductListOptions = {}): Promise<Product[]> {
-  let query = supabase.from('products').select('*').eq('active', true);
+  try {
+    let query = supabase.from('products').select('*').eq('active', true);
 
-  if (handle !== 'all') {
-    query = query.contains('collection_handles', [handle]);
+    if (handle !== 'all') {
+      query = query.contains('collection_handles', [handle]);
+    }
+
+    if (options.inStockOnly) {
+      query = query.eq('in_stock', true);
+    }
+
+    if (options.priceMin !== undefined) {
+      query = query.gte('price', options.priceMin);
+    }
+
+    if (options.priceMax !== undefined) {
+      query = query.lte('price', options.priceMax);
+    }
+
+    if (options.tagFilters && options.tagFilters.length > 0) {
+      query = query.contains('tags', options.tagFilters); 
+    }
+
+    // Sorting
+    switch (options.sort) {
+      case 'price_asc':
+        query = query.order('price', { ascending: true });
+        break;
+      case 'price_desc':
+        query = query.order('price', { ascending: false });
+        break;
+      case 'popular':
+        query = query.order('sort_order', { ascending: true });
+        break;
+      case 'new':
+      default:
+        query = query.order('created_at', { ascending: false });
+        break;
+    }
+
+    // Pagination
+    if (options.limit) {
+      query = query.limit(options.limit);
+    } else if (options.page && options.pageSize) {
+      const from = (options.page - 1) * options.pageSize;
+      const to = from + options.pageSize - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn(`Failed to fetch products for ${handle}:`, error.message);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error(`Exception in listProductsByCollection (${handle}):`, e);
+    return [];
   }
-
-  if (options.inStockOnly) {
-    query = query.eq('in_stock', true);
-  }
-
-  if (options.priceMin !== undefined) {
-    query = query.gte('price', options.priceMin);
-  }
-
-  if (options.priceMax !== undefined) {
-    query = query.lte('price', options.priceMax);
-  }
-
-  if (options.tagFilters && options.tagFilters.length > 0) {
-    // Audit: 'tags' in DB is text (comma separated or simple string) or text[]?
-    // Schema says "tags text". ILIKE is safer for simple text search if not using array column.
-    // If your DB actually has "tags text[]", use .contains. 
-    // Assuming schema "tags text" meant CSV:
-    // query = query.ilike('tags', `%${options.tagFilters[0]}%`); 
-    // BUT, usually in Supabase for tags we recommend text[]. 
-    // I will assume text[] based on your 'contains' usage in original code.
-    // If it fails, check DB column type.
-    query = query.contains('tags', options.tagFilters); 
-  }
-
-  // Sorting
-  switch (options.sort) {
-    case 'price_asc':
-      query = query.order('price', { ascending: true });
-      break;
-    case 'price_desc':
-      query = query.order('price', { ascending: false });
-      break;
-    case 'popular':
-      query = query.order('sort_order', { ascending: true });
-      break;
-    case 'new':
-    default:
-      query = query.order('created_at', { ascending: false });
-      break;
-  }
-
-  // Pagination
-  if (options.limit) {
-    query = query.limit(options.limit);
-  } else if (options.page && options.pageSize) {
-    const from = (options.page - 1) * options.pageSize;
-    const to = from + options.pageSize - 1;
-    query = query.range(from, to);
-  }
-
-  const { data, error } = await query;
-  if (error) return [];
-  return data || [];
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('slug', slug)
-    .maybeSingle();
-  if (error) return null;
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle();
+    if (error) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export async function listProductsByIds(ids: number[]): Promise<Product[]> {
   if (!ids.length) return [];
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .in('id', ids);
-  if (error) return [];
-  return data || [];
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .in('id', ids);
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function searchProducts(queryText: string): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .or(`title_jp.ilike.%${queryText}%,short_desc_jp.ilike.%${queryText}%`)
-    .eq('active', true)
-    .limit(10);
-  if (error) return [];
-  return data || [];
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .or(`title_jp.ilike.%${queryText}%,short_desc_jp.ilike.%${queryText}%`)
+      .eq('active', true)
+      .limit(10);
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 // --- Collections ---
 
 export async function listCollections() {
-  const { data, error } = await supabase
-    .from('collections')
-    .select('*')
-    .eq('active', true)
-    .order('created_at', { ascending: true });
-  if (error) return [];
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('active', true)
+      .order('created_at', { ascending: true });
+    if (error) return [];
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 // --- Coupons ---
 
 export async function getCouponByCode(code: string): Promise<Coupon | null> {
-  const { data, error } = await supabase
-    .from('coupons')
-    .select('*')
-    .eq('code', code.toUpperCase())
-    .eq('active', true)
-    .maybeSingle();
-  if (error) return null;
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('code', code.toUpperCase())
+      .eq('active', true)
+      .maybeSingle();
+    if (error) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 // --- Orders ---
 
 export async function createOrder(order: Partial<Order>) {
-  // Audit: Ensure 'items' is passed as valid JSON
   const { data, error } = await supabase
     .from('orders')
     .insert(order)
@@ -199,33 +237,36 @@ export async function createOrder(order: Partial<Order>) {
 // --- Admin Queries ---
 
 export async function adminGetStats() {
-  const [ordersRes, productsRes] = await Promise.all([
-    supabase.from('orders').select('total, payment_status, created_at'),
-    supabase.from('products').select('id', { count: 'exact' })
-  ]);
+  try {
+    const [ordersRes, productsRes] = await Promise.all([
+      supabase.from('orders').select('total, payment_status, created_at'),
+      supabase.from('products').select('id', { count: 'exact' })
+    ]);
 
-  const orders = ordersRes.data || [];
-  const productCount = productsRes.count || 0;
-  
-  const gmv = orders.reduce((sum, o) => sum + o.total, 0);
-  const paidTotal = orders.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + o.total, 0);
+    const orders = ordersRes.data || [];
+    const productCount = productsRes.count || 0;
+    
+    const gmv = orders.reduce((sum, o) => sum + o.total, 0);
+    const paidTotal = orders.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + o.total, 0);
 
-  // Simple daily stats for last 30 days
-  const dailyStats: Record<string, { gmv: number, count: number }> = {};
-  orders.forEach(o => {
-    const date = new Date(o.created_at).toISOString().split('T')[0];
-    if (!dailyStats[date]) dailyStats[date] = { gmv: 0, count: 0 };
-    dailyStats[date].gmv += o.total;
-    dailyStats[date].count += 1;
-  });
+    const dailyStats: Record<string, { gmv: number, count: number }> = {};
+    orders.forEach(o => {
+      const date = new Date(o.created_at).toISOString().split('T')[0];
+      if (!dailyStats[date]) dailyStats[date] = { gmv: 0, count: 0 };
+      dailyStats[date].gmv += o.total;
+      dailyStats[date].count += 1;
+    });
 
-  return {
-    orderCount: orders.length,
-    productCount,
-    gmv,
-    paidTotal,
-    dailyStats
-  };
+    return {
+      orderCount: orders.length,
+      productCount,
+      gmv,
+      paidTotal,
+      dailyStats
+    };
+  } catch (e) {
+    return { orderCount: 0, productCount: 0, gmv: 0, paidTotal: 0, dailyStats: {} };
+  }
 }
 
 export async function adminListProducts(page: number = 1, limit: number = 50) {
@@ -249,7 +290,6 @@ export async function adminGetProduct(id: number) {
 }
 
 export async function adminUpsertProduct(product: Partial<Product>) {
-  // Clean up undefined values that might cause DB issues
   const cleanProduct = JSON.parse(JSON.stringify(product));
   
   const { data, error } = await supabase

@@ -1,24 +1,21 @@
 
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { listProductsByCollection, ProductListOptions } from "@/lib/supabase/queries";
 import ProductCard from "@/components/ProductCard";
 import CollectionFilters from "@/components/CollectionFilters";
+import { SHOP_CATEGORIES } from "@/lib/categories";
 
-// Static mapping for collection titles
-const COLLECTION_TITLES: Record<string, string> = {
-  'all': '全商品',
-  'best-sellers': 'ベストセラー',
-  'new-arrivals': '新着アイテム',
-  'sale': 'セール',
-  'newborn': '新生児 (0-6ヶ月)',
-  'baby-clothing': 'ベビー服',
-  'kids-clothing': 'キッズ服',
-  'maternity': 'マタニティ',
-  'toys': 'おもちゃ',
-  'gift': 'ギフト',
-  'strollers': 'ベビーカー',
-  'feeding': '授乳・お食事',
+// Use centralized categories for titles, fallback to handle formatter
+const getCollectionTitle = (handle: string) => {
+  const found = SHOP_CATEGORIES.find(c => c.handle === handle);
+  if (found) return found.name;
+  
+  // Static map for others or fallbacks
+  const STATIC_MAP: Record<string, string> = {
+    'all': '全商品',
+    'sale': 'セール',
+  };
+  return STATIC_MAP[handle] || handle.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
 interface PageProps {
@@ -35,8 +32,7 @@ interface PageProps {
 
 export default async function CollectionPage({ params, searchParams }: PageProps) {
   const { handle } = params;
-  
-  const title = COLLECTION_TITLES[handle] || handle.replace(/-/g, ' ');
+  const title = getCollectionTitle(handle);
 
   // Parse Query Params
   const options: ProductListOptions = {
@@ -57,11 +53,11 @@ export default async function CollectionPage({ params, searchParams }: PageProps
   const uniqueTags = Array.from(new Set(allTags)).slice(0, 12); // Top 12 tags
 
   return (
-    <div className="container-base py-8 md:py-12">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800 capitalize mb-2">{title}</h1>
-        <p className="text-gray-500 text-sm">{products.length} アイテム</p>
+    <div className="container-base py-6 md:py-10 min-h-[60vh]">
+      {/* Breadcrumb-ish Header */}
+      <div className="mb-6 border-b pb-4">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">{title}</h1>
+        <p className="text-gray-500 text-xs md:text-sm">{products.length} アイテム</p>
       </div>
 
       {/* Filters */}
@@ -70,15 +66,16 @@ export default async function CollectionPage({ params, searchParams }: PageProps
       {/* Grid */}
       {products.length === 0 ? (
         <div className="py-20 text-center bg-gray-50 rounded-lg">
-            <p className="text-gray-500 mb-4">商品が見つかりませんでした。</p>
-            <Link href="/" className="text-primary border-b border-primary text-sm">
+            <p className="text-gray-500 mb-4 font-medium">条件に一致する商品は見つかりませんでした。</p>
+            <Link href="/" className="btn-secondary inline-block">
                 ホームに戻る
             </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8 md:gap-y-12">
+        // Mobile: 2 cols, Desktop: 4 cols
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-10">
             {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} />
             ))}
         </div>
       )}
@@ -88,17 +85,17 @@ export default async function CollectionPage({ params, searchParams }: PageProps
         {options.page! > 1 && (
             <Link 
                 href={`?page=${options.page! - 1}`}
-                className="btn-secondary py-2 px-4 text-xs"
+                className="btn-secondary py-2 px-6 text-sm"
             >
-                前のページ
+                前へ
             </Link>
         )}
         {products.length === (options.pageSize || 20) && (
              <Link 
                 href={`?page=${(options.page || 1) + 1}`}
-                className="btn-secondary py-2 px-4 text-xs"
+                className="btn-secondary py-2 px-6 text-sm"
             >
-                次のページ
+                次へ
             </Link>
         )}
       </div>

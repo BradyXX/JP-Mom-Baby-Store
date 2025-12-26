@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { Product } from '@/lib/supabase/types';
 import { ImageIcon, ShoppingBag, Check } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-import { useUIStore } from '@/store/useUIStore';
 
 interface ProductCardProps {
   product: Product;
@@ -14,24 +13,26 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCartStore();
-  const { openCart } = useUIStore();
   const [isAdded, setIsAdded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
-  // Safety check for pricing
+  // Pricing & Discount
   const price = product.price || 0;
   const comparePrice = product.compare_at_price;
-  
-  // Calculate discount
   const discount = comparePrice && comparePrice > price
     ? Math.round(((comparePrice - price) / comparePrice) * 100) 
     : 0;
 
-  // Safety check for images
+  // Robust Image Handling
   const rawImage = product.images && Array.isArray(product.images) ? product.images[0] : null;
-  const hasValidImage = typeof rawImage === 'string' && rawImage.length > 0;
+  // Valid if string, not empty, starts with http/https/slash, and no load error occurred
+  const hasValidImage = !imgError && typeof rawImage === 'string' && rawImage.length > 0 && (rawImage.startsWith('http') || rawImage.startsWith('/'));
+
+  // Should we optimize? Only if it comes from our Supabase domain to avoid 400 errors on external links
+  const isInternalImage = typeof rawImage === 'string' && rawImage.includes('supabase.co');
 
   const handleQuickAdd = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigation
+    e.preventDefault(); 
     e.stopPropagation();
 
     addItem({
@@ -48,25 +49,24 @@ export default function ProductCard({ product }: ProductCardProps) {
     });
 
     setIsAdded(true);
-    // Optional: Open cart drawer automatically
-    // openCart(); 
-    
-    // Reset "Added" state after 2 seconds
     setTimeout(() => setIsAdded(false), 2000);
   };
 
   return (
     <Link href={`/products/${product.slug}`} className="group block h-full flex flex-col bg-white rounded-lg overflow-hidden relative">
       
-      {/* Image Container: 4:5 Aspect Ratio for Mobile Appeal */}
+      {/* Image Container: 4:5 Aspect Ratio */}
       <div className="relative aspect-[4/5] bg-gray-100 mb-2 overflow-hidden rounded-lg border border-gray-100/50">
         {hasValidImage ? (
           <Image
-            src={rawImage}
+            src={rawImage!}
             alt={product.title_jp || 'Product'}
             fill
             sizes="(max-width: 768px) 50vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-105"
+            // CRITICAL FIX: Bypass optimization for external links to prevent 400 Bad Request
+            unoptimized={!isInternalImage}
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 bg-gray-50">
@@ -75,7 +75,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         )}
 
-        {/* Badges (Over Image) */}
+        {/* Badges */}
         <div className="absolute top-0 left-0 p-1.5 flex flex-col gap-1 w-full items-start z-10">
             {!product.in_stock && (
               <span className="bg-gray-900/90 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm backdrop-blur-sm">
@@ -89,7 +89,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
         </div>
 
-        {/* Quick Add Button (Mobile/Desktop) */}
+        {/* Quick Add Button */}
         {product.in_stock && (
           <button
             onClick={handleQuickAdd}
@@ -103,14 +103,11 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
       </div>
 
-      {/* Product Info */}
+      {/* Info */}
       <div className="flex-1 flex flex-col px-0.5 pb-2">
-        {/* Title (2 lines max) */}
         <h3 className="text-xs md:text-sm text-gray-800 font-medium leading-[1.4] line-clamp-2 min-h-[2.8em] mb-1.5 group-hover:text-primary transition-colors">
             {product.title_jp || 'Untitled Product'}
         </h3>
-
-        {/* Price Row */}
         <div className="mt-auto flex items-baseline gap-2 flex-wrap">
             <span className="text-sm md:text-base font-bold text-gray-900">
               ¥{price.toLocaleString()}

@@ -4,11 +4,13 @@ import { useRouter } from 'next/navigation';
 import { adminUpsertProduct, listCollections } from '@/lib/supabase/queries';
 import { Product } from '@/lib/supabase/types';
 import ImageUploader from '@/components/admin/ImageUploader';
-import { Loader2, RefreshCw, Save } from 'lucide-react';
+import { Loader2, RefreshCw, Save, CloudLightning } from 'lucide-react';
+import { migrateProductImages } from '@/app/actions/image-migration';
 
 export default function ProductForm({ initialData }: { initialData?: Partial<Product> }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [migrating, setMigrating] = useState(false);
   const [collections, setCollections] = useState<any[]>([]);
   
   // Temp state for the simple "Long Description" text editor
@@ -40,7 +42,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   useEffect(() => {
     listCollections().then(setCollections);
     
-    // Initialize longDescText from JSON if it exists and looks like a simple text block
     if (initialData?.long_desc_sections && Array.isArray(initialData.long_desc_sections)) {
        const sections = initialData.long_desc_sections as any[];
        const textSection = sections.find(s => s.type === 'text');
@@ -50,14 +51,40 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
     }
   }, [initialData]);
 
+  // --- Image Migration Logic ---
+  const handleMigrateImages = async () => {
+    if (!formData.id || !formData.slug || !formData.images?.length) {
+      alert('商品ID、Slug、または画像がありません。先に保存してください。');
+      return;
+    }
+
+    if (!confirm('外部画像をSupabase Storageにコピーしますか？\n（元のURLは自動的に置き換えられます）')) return;
+
+    setMigrating(true);
+    try {
+      const result = await migrateProductImages(formData.id, formData.slug, formData.images);
+      
+      if (result.success) {
+        setFormData(prev => ({ ...prev, images: result.updatedImages }));
+        alert(result.message);
+      } else {
+        alert('エラー: ' + result.message);
+      }
+    } catch (e: any) {
+      alert('移行失敗: ' + e.message);
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   // --- Generator Logic ---
 
   const generateSlugFromName = (name: string): string => {
     return name
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphen
-      .replace(/^-+|-+$/g, '');    // Trim leading/trailing hyphens
+      .replace(/[^a-z0-9]+/g, '-') 
+      .replace(/^-+|-+$/g, '');   
   };
 
   const handleGenerateSlug = () => {
@@ -71,7 +98,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   };
 
   const handleGenerateSku = () => {
-    // 1. Try to use current slug as base, otherwise generate from title
     let base = formData.slug;
     if (!base && formData.title_jp) {
        base = generateSlugFromName(formData.title_jp);
@@ -82,12 +108,8 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       return;
     }
 
-    // 2. Generate SKU: SKU-{base}-{random4}
-    // Limit base length to 15 chars to keep SKU manageable
     const shortBase = base.slice(0, 15);
-    const random4 = Math.floor(1000 + Math.random() * 9000); // 1000-9999
-    
-    // Ensure uppercase for SKU standard
+    const random4 = Math.floor(1000 + Math.random() * 9000); 
     const newSku = `SKU-${shortBase}-${random4}`.toUpperCase();
 
     setFormData(prev => ({ ...prev, sku: newSku }));
@@ -100,17 +122,13 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
     setSaving(true);
     
     try {
-      // Construct Long Description JSON if text exists
-      // Simple MVP: We wrap the textarea content into a single "text" section
       const longDescPayload = longDescText 
         ? [{ type: 'text', content: longDescText }] 
         : [];
 
-      // Ensure array fields are not null/undefined for DB
       const payload = {
         ...formData,
         long_desc_sections: longDescPayload,
-        // Ensure numeric fields are numbers
         price: Number(formData.price),
         compare_at_price: formData.compare_at_price ? Number(formData.compare_at_price) : null,
         stock_qty: Number(formData.stock_qty),
@@ -271,7 +289,21 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
 
       {/* Media */}
       <section className="bg-white p-6 rounded shadow border border-gray-200 space-y-6">
-        <h2 className="text-lg font-bold border-b pb-2 mb-4">商品画像</h2>
+        <div className="flex justify-between items-center border-b pb-2 mb-4">
+           <h2 className="text-lg font-bold">商品画像</h2>
+           {formData.id && (
+             <button
+               type="button"
+               onClick={handleMigrateImages}
+               disabled={migrating}
+               className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded flex items-center gap-1 transition-colors"
+               title="外部URLの画像をSupabaseに保存します"
+             >
+               {migrating ? <Loader2 className="animate-spin" size={14} /> : <CloudLightning size={14} />}
+               画像一括移行
+             </button>
+           )}
+        </div>
         <ImageUploader 
           images={formData.images || []} 
           onChange={(newImages) => setFormData({ ...formData, images: newImages })} 

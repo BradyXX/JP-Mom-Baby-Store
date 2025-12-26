@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, ShoppingBag, Zap, Check, Truck, ShieldCheck, RotateCcw, Clock, Wallet, Flame } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Zap, Check, Truck, ShieldCheck, RotateCcw, Clock, Wallet, Flame, ImageIcon } from 'lucide-react';
 import { Product } from '@/lib/supabase/types';
 import { useCartStore } from '@/store/useCartStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -26,31 +26,37 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   // Ref for mobile scroll container
   const mobileScrollRef = useRef<HTMLDivElement>(null);
 
-  // Parse Variants
-  const variantDef = Array.isArray(product.variants) 
-    ? (product.variants as unknown as VariantOption[]) 
-    : [];
+  // FIX: Robust check for variants to prevent "options.map is not a function" crash
+  const variantDef = (Array.isArray(product.variants) 
+    ? product.variants 
+    : []) as unknown as VariantOption[];
   
   // State for selections
   const [selections, setSelections] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     variantDef.forEach(v => {
-      if (v.options.length > 0) initial[v.name] = v.options[0];
+      // Ensure v.options is actually an array
+      if (Array.isArray(v.options) && v.options.length > 0) {
+        initial[v.name] = v.options[0];
+      }
     });
     return initial;
   });
 
-  // Helper to prepare cart item
   const getCartItemPayload = () => {
     const variantTitle = Object.values(selections).join(' / ');
     const variantId = Object.values(selections).join('-');
+    
+    // Safety for images
+    const safeImage = (product.images && product.images[0]) || '';
+
     return {
       productId: product.id,
       collectionHandles: product.collection_handles || [],
       slug: product.slug,
       title: product.title_jp,
       price: product.price,
-      image: product.images[0],
+      image: safeImage,
       quantity: quantity,
       maxStock: product.stock_qty,
       variantId: variantDef.length > 0 ? variantId : undefined,
@@ -60,12 +66,12 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
   const handleAddToCart = () => {
     addItem(getCartItemPayload());
-    openCart(); // Just open drawer
+    openCart(); 
   };
 
   const handleBuyNow = () => {
     addItem(getCartItemPayload());
-    router.push('/checkout'); // Direct redirect
+    router.push('/checkout');
   };
 
   const handleMobileScroll = () => {
@@ -80,8 +86,34 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100) 
   : 0;
 
-  // RULE: Render short_desc_jp if available, otherwise fallback to description
   const shortDescription = product.short_desc_jp || product.description;
+
+  // Image Rendering Helper
+  const renderSafeImage = (src: string, alt: string, priority = false) => {
+    const isValid = typeof src === 'string' && (src.startsWith('http') || src.startsWith('/'));
+    const isInternal = isValid && src.includes('supabase.co');
+
+    if (!isValid) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-300">
+           <ImageIcon size={32} />
+           <span className="text-xs mt-1">No Image</span>
+        </div>
+      );
+    }
+
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        priority={priority}
+        className="object-contain"
+        // CRITICAL FIX: Bypass optimization for external links to prevent 400 Bad Request/White Screen
+        unoptimized={!isInternal}
+      />
+    );
+  };
 
   return (
     <div className="grid md:grid-cols-2 gap-8 lg:gap-12 pb-4 md:pb-0">
@@ -89,52 +121,48 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       {/* Image Gallery */}
       <div className="space-y-4 -mx-4 md:mx-0">
         
-        {/* Mobile: 1:1 Square (Fold optimization) */}
+        {/* Mobile: 1:1 Square */}
         <div className="md:hidden relative w-full aspect-square bg-white border-b border-gray-100">
           <div 
              ref={mobileScrollRef}
              onScroll={handleMobileScroll}
              className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full"
           >
-             {product.images.map((img, i) => (
+             {(product.images && product.images.length > 0) ? product.images.map((img, i) => (
                 <div key={i} className="w-full h-full flex-shrink-0 snap-center relative flex items-center justify-center p-4">
-                   <Image
-                    src={img}
-                    alt={`${product.title_jp} - ${i + 1}`}
-                    fill
-                    priority={i === 0}
-                    className="object-contain" 
-                   />
+                   {renderSafeImage(img, `${product.title_jp} - ${i + 1}`, i === 0)}
                 </div>
-             ))}
+             )) : (
+                <div className="w-full h-full flex items-center justify-center">
+                   {renderSafeImage('', product.title_jp)}
+                </div>
+             )}
           </div>
           {/* Mobile Dots */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-             {product.images.map((_, i) => (
-               <div 
-                 key={i} 
-                 className={`h-1.5 rounded-full transition-all shadow-sm ${selectedImageIndex === i ? 'bg-gray-800 w-4' : 'bg-gray-300 w-1.5'}`} 
-               />
-             ))}
-          </div>
+          {product.images && product.images.length > 1 && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+               {product.images.map((_, i) => (
+                 <div 
+                   key={i} 
+                   className={`h-1.5 rounded-full transition-all shadow-sm ${selectedImageIndex === i ? 'bg-gray-800 w-4' : 'bg-gray-300 w-1.5'}`} 
+                 />
+               ))}
+            </div>
+          )}
         </div>
 
         {/* Desktop: Standard Square */}
         <div className="hidden md:block relative aspect-square bg-gray-50 rounded-lg overflow-hidden border border-gray-100">
-          {product.images[selectedImageIndex] && (
-            <Image
-              src={product.images[selectedImageIndex]}
-              alt={product.title_jp}
-              fill
-              priority
-              className="object-contain p-4"
-            />
+          {product.images && product.images[selectedImageIndex] ? (
+            renderSafeImage(product.images[selectedImageIndex], product.title_jp, true)
+          ) : (
+            renderSafeImage('', product.title_jp)
           )}
         </div>
 
-        {/* Thumbnail Strip (Both, but synced) */}
+        {/* Thumbnail Strip */}
         <div className="hidden md:flex gap-2 overflow-x-auto pb-2 scrollbar-hide px-4 md:px-0">
-          {product.images.map((img, i) => (
+          {product.images && product.images.map((img, i) => (
             <button
               key={i}
               onClick={() => {
@@ -144,7 +172,9 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 selectedImageIndex === i ? 'border-primary' : 'border-transparent'
               }`}
             >
-              <Image src={img} alt="" fill className="object-contain p-1" />
+              <div className="w-full h-full relative p-1">
+                 {renderSafeImage(img, `thumb-${i}`)}
+              </div>
             </button>
           ))}
         </div>
@@ -161,10 +191,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
            <span className="text-[10px] md:text-xs text-gray-500 font-medium">👶 ママに選ばれています</span>
         </div>
 
-        {/* Title */}
         <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-relaxed tracking-tight">{product.title_jp}</h1>
         
-        {/* Price Row */}
         <div className="flex items-end gap-3 pb-2 border-b border-gray-50">
           <span className="text-3xl font-bold text-red-600 leading-none tracking-tight">¥{product.price.toLocaleString()}</span>
           {product.compare_at_price && (
@@ -177,7 +205,6 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           )}
         </div>
 
-        {/* P2 - Urgency (Soft) */}
         <div className="mt-2 mb-4">
            <p className="text-xs text-red-600 font-bold flex items-center gap-1">
                <Clock size={14} /> 
@@ -185,7 +212,6 @@ export default function ProductDetail({ product }: ProductDetailProps) {
            </p>
         </div>
 
-        {/* Product Specific Features (Value Prop) */}
         <div className="bg-secondary/60 p-4 rounded-lg mb-6 text-sm text-gray-700 space-y-2 border border-gray-100">
            <div className="flex items-center gap-2 font-medium">
               <Check className="text-primary flex-shrink-0" size={16} strokeWidth={3} /> 
@@ -201,7 +227,6 @@ export default function ProductDetail({ product }: ProductDetailProps) {
            </div>
         </div>
 
-        {/* Short Description (Summary) */}
         {shortDescription && (
           <div className="mb-6">
              <p className="text-sm md:text-base text-gray-600 font-medium leading-relaxed line-clamp-4">
@@ -215,7 +240,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           <div key={v.name} className="mb-5">
             <span className="text-xs font-bold text-gray-500 block mb-2 uppercase tracking-wide">{v.name}</span>
             <div className="flex flex-wrap gap-2">
-              {v.options.map((opt) => (
+              {Array.isArray(v.options) && v.options.map((opt) => (
                 <button
                   key={opt}
                   onClick={() => setSelections(prev => ({ ...prev, [v.name]: opt }))}
@@ -232,7 +257,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           </div>
         ))}
 
-        {/* Desktop Actions (Hidden on Mobile) */}
+        {/* Desktop Actions */}
         <div className="hidden md:block border-t border-gray-100 pt-6 mt-6">
           {product.in_stock ? (
             <div className="flex flex-col gap-4">
@@ -279,7 +304,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           )}
         </div>
 
-        {/* P1 - Trust Module (Visible on ALL screens below CTA area) */}
+        {/* Trust Module */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
              <div className="flex items-center gap-2.5 text-xs font-bold text-gray-700">
                 <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-gray-200 text-primary shrink-0">

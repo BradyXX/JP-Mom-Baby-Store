@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, ShoppingBag, Zap, Check, MessageCircle } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Zap, Check, MessageCircle, Truck, ShieldCheck, CreditCard } from 'lucide-react';
 import { Product } from '@/lib/supabase/types';
 import { useCartStore } from '@/store/useCartStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -150,13 +150,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       {/* Info & Actions */}
       <div className="px-4 md:px-0">
         {/* Title */}
-        <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-snug">{product.title_jp}</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 leading-snug tracking-tight">{product.title_jp}</h1>
         
         {/* Price Row */}
-        <div className="flex items-end gap-3 mb-4 pb-2 border-b border-gray-100 md:border-none">
-          <span className="text-2xl font-bold text-red-600 leading-none">¥{product.price.toLocaleString()}</span>
+        <div className="flex items-end gap-3 mb-6 border-b border-gray-50 pb-4">
+          <span className="text-3xl font-bold text-red-600 leading-none tracking-tight">¥{product.price.toLocaleString()}</span>
           {product.compare_at_price && (
-            <div className="flex items-center gap-2 mb-0.5">
+            <div className="flex items-center gap-2 mb-1">
               <span className="text-gray-400 line-through text-sm">¥{product.compare_at_price.toLocaleString()}</span>
               <span className="bg-red-100 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded">
                 -{discount}%
@@ -165,10 +165,10 @@ export default function ProductDetail({ product }: ProductDetailProps) {
           )}
         </div>
 
-        {/* Short Description (Key Selling Points) */}
+        {/* Short Description (Key Selling Points) - Enhanced Typography */}
         {product.short_desc_jp && (
-          <div className="bg-gray-50/50 p-3 rounded-md mb-6 border border-gray-100/50">
-             <p className="text-gray-700 text-sm leading-relaxed font-medium">
+          <div className="mb-6">
+             <p className="text-base text-gray-700 font-medium leading-relaxed">
                 {product.short_desc_jp}
              </p>
           </div>
@@ -274,19 +274,22 @@ export default function ProductDetail({ product }: ProductDetailProps) {
            </div>
         )}
 
-        {/* Shipping Note (Mobile/Desktop) */}
-        <div className="mt-6 md:mt-8 p-4 bg-blue-50/50 rounded-lg text-xs text-gray-600 space-y-2 border border-blue-100">
-           <div className="flex items-center gap-2">
-             <Check size={14} className="text-blue-500" />
-             <span>日本国内から最短3日でお届け</span>
-           </div>
-           <div className="flex items-center gap-2">
-             <Check size={14} className="text-blue-500" />
-             <span>10,000円以上で送料無料</span>
-           </div>
-           <div className="flex items-center gap-2">
-             <Check size={14} className="text-blue-500" />
-             <span>代金引換対応</span>
+        {/* Shipping Note (Optimized for Mobile Space) */}
+        {/* Changed from Vertical List to Horizontal Grid/Flex to save vertical space */}
+        <div className="mt-6 md:mt-8 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+           <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-1">
+             <div className="flex items-center gap-1.5 w-[48%]">
+               <Truck size={16} className="text-blue-500 flex-shrink-0" />
+               <span className="text-xs text-gray-700 font-bold whitespace-nowrap">最短3日でお届け</span>
+             </div>
+             <div className="flex items-center gap-1.5 w-[48%]">
+               <ShieldCheck size={16} className="text-blue-500 flex-shrink-0" />
+               <span className="text-xs text-gray-700 font-bold whitespace-nowrap">安心検品・国内発送</span>
+             </div>
+             <div className="flex items-center gap-1.5 w-full pt-1 border-t border-blue-100/50 mt-1">
+               <CreditCard size={16} className="text-blue-500 flex-shrink-0" />
+               <span className="text-xs text-gray-700 font-bold">代金引換（現金）/ 1万円以上送料無料</span>
+             </div>
            </div>
         </div>
       </div>

@@ -32,18 +32,14 @@ export default async function ProductPage({ params }: { params: { slug: string }
       {/* Top Section */}
       <div className="container-base py-4 md:py-12">
         <ProductDetail product={product} />
-        {/* NEW: Trust Section Below Top Info */}
-        <div className="mt-8 max-w-xl">
-           <ProductTrustSection />
-        </div>
       </div>
 
-      <div className="border-t border-gray-100 my-4 md:my-8" />
+      <div className="border-t border-gray-100 my-2 md:my-8" />
 
-      {/* Description Content */}
+      {/* Description Content - Moved ABOVE Trust Section for better flow */}
       <div className="container-base max-w-3xl mx-auto mb-16 space-y-12">
         
-        {/* Long Description Block */}
+        {/* Long Description Block (Expandable) */}
         <section>
            <h2 className="text-lg font-bold flex items-center gap-2 mb-6">
               <span className="w-1 h-6 bg-primary rounded-full"></span>
@@ -51,6 +47,11 @@ export default async function ProductPage({ params }: { params: { slug: string }
            </h2>
            <ProductDescription sections={descriptionSections} />
         </section>
+        
+        {/* Trust Section (General Policies) */}
+        <div className="max-w-xl mx-auto">
+           <ProductTrustSection />
+        </div>
 
         {/* FAQs */}
         <section className="bg-gray-50 p-6 rounded-2xl">

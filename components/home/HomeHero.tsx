@@ -1,12 +1,13 @@
 
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Slide {
-  image_url: string;
+  image_url: string;        // Desktop
+  mobile_image_url?: string; // Mobile
   link?: string;
   alt?: string;
 }
@@ -19,8 +20,11 @@ export default function HomeHero({ slides }: HomeHeroProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
-  // Fallback if no slides or empty array
-  const validSlides = slides.filter(s => s.image_url && s.image_url.trim() !== '');
+  // Fallback: Check if AT LEAST one image exists (desktop or mobile)
+  const validSlides = slides.filter(s => 
+    (s.image_url && s.image_url.trim() !== '') || 
+    (s.mobile_image_url && s.mobile_image_url.trim() !== '')
+  );
 
   // Auto-play logic
   useEffect(() => {
@@ -63,22 +67,45 @@ export default function HomeHero({ slides }: HomeHeroProps) {
           className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {validSlides.map((slide, index) => (
-            <div key={index} className="relative w-full h-full flex-shrink-0">
-               <Image 
-                src={slide.image_url} 
-                alt={slide.alt || 'Banner'} 
-                fill 
-                priority={index === 0}
-                sizes="(max-width: 768px) 100vw, 1200px"
-                className="object-cover object-center"
-              />
-              {/* Optional: Text Overlay only if link exists to indicate clickability */}
-              {slide.link && (
-                 <Link href={slide.link} className="absolute inset-0 z-10" aria-label={slide.alt || "Banner link"} />
-              )}
-            </div>
-          ))}
+          {validSlides.map((slide, index) => {
+             // Fallback logic: if mobile missing, use desktop. If desktop missing, use mobile.
+             const desktopSrc = slide.image_url || slide.mobile_image_url || '';
+             const mobileSrc = slide.mobile_image_url || slide.image_url || '';
+             const altText = slide.alt || 'Banner';
+
+             return (
+              <div key={index} className="relative w-full h-full flex-shrink-0">
+                 {/* Desktop Image (Hidden on Mobile) */}
+                 <div className="hidden md:block w-full h-full relative">
+                    <Image 
+                      src={desktopSrc} 
+                      alt={altText} 
+                      fill 
+                      priority={index === 0}
+                      sizes="1200px"
+                      className="object-cover object-center"
+                    />
+                 </div>
+                 
+                 {/* Mobile Image (Hidden on Desktop) */}
+                 <div className="block md:hidden w-full h-full relative">
+                    <Image 
+                      src={mobileSrc} 
+                      alt={altText} 
+                      fill 
+                      priority={index === 0}
+                      sizes="100vw"
+                      className="object-cover object-center"
+                    />
+                 </div>
+
+                {/* Optional: Clickable Overlay */}
+                {slide.link && (
+                   <Link href={slide.link} className="absolute inset-0 z-10" aria-label={altText} />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Controls (Only if > 1 slide) */}

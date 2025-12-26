@@ -8,7 +8,6 @@ import HomeHero from '@/components/home/HomeHero'; // Updated Component
 import CategorySection from '@/components/home/CategorySection';
 import CategoryIcon from '@/components/CategoryIcon';
 import InfoCards from '@/components/home/InfoCards'; // New Component
-import FeaturedCategories from '@/components/home/FeaturedCategories'; // New Component
 import { getLineAddFriendLink } from '@/lib/utils/line';
 
 // IMPORTANT: Disable cache to ensure homepage is always fresh
@@ -60,13 +59,13 @@ export default async function Home() {
     const settings = await getSettings();
 
     // Prepare Slides Data (Safe parsing)
+    // Supports both image_url (desktop) and mobile_image_url
     const slides = (Array.isArray(settings.hero_slides) 
         ? settings.hero_slides 
-        : []) as { image_url: string; link?: string; alt?: string }[];
+        : []) as { image_url: string; mobile_image_url?: string; link?: string; alt?: string }[];
 
     // Prepare LINE URL (Server-side random selection)
     const rawOas = (Array.isArray(settings.line_oas) ? settings.line_oas : []) as string[];
-    // Use a simple random pick. In a real serverless edge case, math.random is fine per request.
     const randomOa = rawOas.length > 0 ? rawOas[Math.floor(Math.random() * rawOas.length)] : null;
     const lineUrl = getLineAddFriendLink(randomOa || null);
 
@@ -101,10 +100,7 @@ export default async function Home() {
         {/* 2. Info Cards (3 Columns, LINE link) */}
         <InfoCards lineUrl={lineUrl} />
 
-        {/* 3. Featured Categories (3 Large Blocks) */}
-        <FeaturedCategories />
-
-        {/* 4. Original Category Chips (Quick Nav) - Kept but styled simply */}
+        {/* 3. Original Category Chips (Quick Nav) - Kept but styled simply */}
         <section className="container-base py-6 border-b border-gray-50 mt-4">
           <div className="flex items-center justify-between mb-3 px-1">
              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">カテゴリー</h4>
@@ -127,7 +123,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 5. Product Floors */}
+        {/* 4. Product Floors */}
         <div className="space-y-2 md:space-y-4">
           {sectionsData.map((section) => (
              <CategorySection 
@@ -138,14 +134,14 @@ export default async function Home() {
           ))}
         </div>
 
-        {/* 6. Empty State */}
+        {/* 5. Empty State */}
         {sectionsData.every(s => s.products.length === 0) && (
            <div className="py-20 text-center text-gray-400">
               <p>商品準備中...</p>
            </div>
         )}
 
-        {/* 7. Newsletter */}
+        {/* 6. Newsletter */}
         <div className="mt-12">
           <Newsletter />
         </div>

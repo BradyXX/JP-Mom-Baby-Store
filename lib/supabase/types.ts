@@ -46,7 +46,7 @@ export interface Product {
   short_desc_jp: string | null;
   description: string | null; // Legacy description field
   long_desc_sections: Json; // DB: jsonb
-  tags: string; // DB: text (comma separated usually, or just text) - Checking schema said 'text' not 'text[]'
+  tags: string[]; // DB: text[]
   collection_handles: string[]; // DB: text[]
   variants: Json; // DB: jsonb
   recommended_product_ids: number[]; // DB: int8[]

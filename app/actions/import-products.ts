@@ -1,13 +1,13 @@
+
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
 import { Product } from '@/lib/supabase/types';
+import { normalizeStringArray, normalizeNumberArray } from '@/lib/utils/arrays';
 
-// Supabase Admin Client (Required for Storage uploads & ignoring RLS if needed)
+// Supabase Admin Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-// Note: In a real prod env, use SERVICE_ROLE_KEY for admin tasks, but ANON is okay if policies allow logic.
-// For robust storage upload from server, Service Role is safer, but we stick to existing envs for now.
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const STORAGE_BUCKET = 'product-images';
@@ -16,7 +16,7 @@ const STORAGE_BUCKET = 'product-images';
 
 function generateRandomSku(slugBase: string): string {
   const prefix = slugBase.charAt(0).toLowerCase() || 'p';
-  const randomNum = Math.floor(100000 + Math.random() * 900000); // 6 digits
+  const randomNum = Math.floor(100000 + Math.random() * 900000); 
   return `${prefix}${randomNum}`;
 }
 
@@ -25,8 +25,8 @@ function sanitizeSlug(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphen
-    .replace(/^-+|-+$/g, '') || `prod-${Date.now()}`; // Handle empty result (e.g. all Japanese)
+    .replace(/[^a-z0-9]+/g, '-') 
+    .replace(/^-+|-+$/g, '') || `prod-${Date.now()}`;
 }
 
 // --- Helper: Price Calculation ---
@@ -36,7 +36,6 @@ function calculatePrice(raw: any, rate: number, rounding: 10 | 50 | 100): number
   if (isNaN(val) || val <= 0) return 0;
   
   const jpy = val * rate;
-  // Round up to nearest X
   return Math.ceil(jpy / rounding) * rounding;
 }
 
@@ -46,8 +45,6 @@ async function migrateImage(url: string, slug: string, index: number): Promise<s
   if (!url || typeof url !== 'string') return null;
   const cleanUrl = url.trim();
   if (!cleanUrl.startsWith('http')) return null;
-
-  // Skip if already on our supabase
   if (cleanUrl.includes('supabase.co')) return cleanUrl;
 
   try {
@@ -58,7 +55,6 @@ async function migrateImage(url: string, slug: string, index: number): Promise<s
     const buffer = await blob.arrayBuffer();
     const type = res.headers.get('content-type') || 'image/jpeg';
     
-    // Determine extension
     let ext = 'jpg';
     if (type.includes('png')) ext = 'png';
     else if (type.includes('webp')) ext = 'webp';
@@ -75,11 +71,11 @@ async function migrateImage(url: string, slug: string, index: number): Promise<s
     return data.publicUrl;
   } catch (e) {
     console.error(`Failed to migrate image ${cleanUrl}:`, e);
-    return null; // Return null on failure, don't break the whole row
+    return null;
   }
 }
 
-// --- Main Action: Process Batch ---
+// --- Main Action ---
 
 export type ImportSettings = {
   exchangeRate: number;
@@ -106,7 +102,6 @@ export async function processImportBatch(
 ): Promise<ImportResult> {
   const rowResults: ImportResult['rowResults'] = [];
 
-  // FIXED: Use standard for-loop instead of .entries() iterator to avoid TypeScript downlevelIteration error
   for (let idx = 0; idx < rows.length; idx++) {
     const row = rows[idx];
     const rowTitle = row[Object.keys(row).find(k => mapping[k] === 'title_jp') || ''] || 'Unknown Product';
@@ -122,58 +117,37 @@ export async function processImportBatch(
 
       // 2. Data Cleaning & Defaults
       
-      // Title
       const title_jp = rawData.title_jp?.trim();
       if (!title_jp) throw new Error('商品名(title_jp)が必須です');
 
-      // Slug (Ensure Unique later)
       let slug = rawData.slug ? sanitizeSlug(rawData.slug) : sanitizeSlug(title_jp);
-      
-      // SKU
       const sku = rawData.sku ? String(rawData.sku).trim() : generateRandomSku(slug);
 
-      // Price
       const price = calculatePrice(rawData.price, settings.exchangeRate, settings.roundingRule);
       const compare_at = rawData.compare_at_price 
         ? calculatePrice(rawData.compare_at_price, settings.exchangeRate, settings.roundingRule) 
         : null;
 
-      // Images (Parse & Migrate)
-      let imageUrls: string[] = [];
-      const rawImages = rawData.images;
-      
-      if (rawImages) {
-        // Try parsing JSON or split comma
-        try {
-          if (rawImages.startsWith('[')) {
-            imageUrls = JSON.parse(rawImages);
-          } else {
-            imageUrls = rawImages.split(/,|，|\n/).map((s: string) => s.trim()).filter(Boolean);
-          }
-        } catch {
-          imageUrls = [String(rawImages).trim()];
-        }
-      }
+      // Images (Normalized using util)
+      const imageUrls = normalizeStringArray(rawData.images);
 
-      // 🚀 Image Migration (Concurrent)
-      // Limit concurrency to 3 to be safe
+      // 🚀 Image Migration
       const newImages: string[] = [];
       const imagePromises = imageUrls.map((url, i) => migrateImage(url, slug, i));
       const migratedResults = await Promise.all(imagePromises);
       migratedResults.forEach(res => { if(res) newImages.push(res); });
 
-      // Collections
+      // Collections (Strict normalization)
+      const csvCollections = normalizeStringArray(rawData.collection_handles);
       const collection_handles = settings.collectionHandle 
-        ? [settings.collectionHandle] 
-        : (rawData.collection_handles ? rawData.collection_handles.split(',').map((s:string) => s.trim()) : []);
+        ? [...csvCollections, settings.collectionHandle] 
+        : csvCollections;
+      const uniqueCollections = Array.from(new Set(collection_handles)); // Dedupe
 
-      // Tags
-      const tags = rawData.tags ? String(rawData.tags) : ''; // Store as text string for this schema
+      // Tags (Strict normalization)
+      const tags = normalizeStringArray(rawData.tags);
 
-      // Descriptions
       const short_desc = rawData.short_desc_jp || '';
-      // We don't parse complex long_desc json from CSV easily, assume empty or plain text wrapped
-      const long_desc_sections = []; 
 
       // 3. Construct Payload
       const productPayload: Partial<Product> = {
@@ -183,39 +157,32 @@ export async function processImportBatch(
         price,
         compare_at_price: compare_at,
         stock_qty: rawData.stock_qty ? Number(rawData.stock_qty) : settings.defaultStock,
-        in_stock: true, // Force true per requirement
+        in_stock: true,
         active: true,
-        images: newImages,
-        collection_handles,
-        tags,
+        images: newImages, // guaranteed string[]
+        collection_handles: uniqueCollections, // guaranteed string[]
+        tags, // guaranteed string[]
         short_desc_jp: short_desc,
         long_desc_sections: [],
-        variants: [], // Simple product for CSV
+        variants: [],
         recommended_product_ids: [],
         sort_order: 0,
-        // created_at is auto
       };
 
       // 4. DB Operation
       let error: any = null;
 
       if (settings.mode === 'upsert') {
-         // Upsert based on slug if ID not provided
          const { error: upsertError } = await supabase
            .from('products')
            .upsert(productPayload, { onConflict: 'slug', ignoreDuplicates: false });
          error = upsertError;
       } else {
-         // Insert Only
-         // Check existence first to avoid hard error if we want to "skip"
          const { data: existing } = await supabase.from('products').select('id').eq('slug', slug).maybeSingle();
-         
          if (existing) {
-             // Handle collision: Append suffix
              productPayload.slug = `${slug}-${Math.floor(Math.random()*1000)}`;
              productPayload.sku = `${sku}-${Math.floor(Math.random()*1000)}`;
          }
-         
          const { error: insertError } = await supabase
            .from('products')
            .insert(productPayload);

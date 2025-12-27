@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,6 +7,7 @@ import { Product } from '@/lib/supabase/types';
 import ImageUploader from '@/components/admin/ImageUploader';
 import { Loader2, RefreshCw, Save, CloudLightning } from 'lucide-react';
 import { migrateProductImages } from '@/app/actions/image-migration';
+import { normalizeStringArray, normalizeNumberArray } from '@/lib/utils/arrays';
 
 export default function ProductForm({ initialData }: { initialData?: Partial<Product> }) {
   const router = useRouter();
@@ -13,6 +15,9 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   const [migrating, setMigrating] = useState(false);
   const [collections, setCollections] = useState<any[]>([]);
   
+  // Local state for Tag Input (String)
+  const [tagInput, setTagInput] = useState('');
+
   // Temp state for the simple "Long Description" text editor
   const [longDescText, setLongDescText] = useState('');
 
@@ -28,26 +33,34 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       stock_qty: 0,
       in_stock: true,
       active: true,
-      images: [] as string[],
-      tags: '', 
-      collection_handles: [] as string[],
+      images: [], // Ensure initialized as empty array
+      tags: [], 
+      collection_handles: [],
       short_desc_jp: '',
       sort_order: 0,
-      variants: [] as any[], 
-      recommended_product_ids: [] as number[],
-      long_desc_sections: [] as any[],
+      variants: [], 
+      recommended_product_ids: [],
+      long_desc_sections: [],
     };
   });
 
   useEffect(() => {
     listCollections().then(setCollections);
     
-    if (initialData?.long_desc_sections && Array.isArray(initialData.long_desc_sections)) {
-       const sections = initialData.long_desc_sections as any[];
-       const textSection = sections.find(s => s.type === 'text');
-       if (textSection) {
-          setLongDescText(textSection.content || '');
-       }
+    if (initialData) {
+      // 1. Handle Long Desc
+      if (Array.isArray(initialData.long_desc_sections)) {
+         const sections = initialData.long_desc_sections as any[];
+         const textSection = sections.find(s => s.type === 'text');
+         if (textSection) {
+            setLongDescText(textSection.content || '');
+         }
+      }
+      
+      // 2. Handle Tags for Display (Array -> Comma String)
+      // 使用 normalizeStringArray 确保哪怕 initialData 给的是脏数据也能正确转为数组再 join
+      const safeTags = normalizeStringArray(initialData.tags);
+      setTagInput(safeTags.join(', '));
     }
   }, [initialData]);
 
@@ -62,7 +75,9 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
 
     setMigrating(true);
     try {
-      const result = await migrateProductImages(formData.id, formData.slug, formData.images);
+      // images 必须是数组
+      const safeImages = normalizeStringArray(formData.images);
+      const result = await migrateProductImages(formData.id, formData.slug, safeImages);
       
       if (result.success) {
         setFormData(prev => ({ ...prev, images: result.updatedImages }));
@@ -92,7 +107,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       alert('先に商品名を入力してください');
       return;
     }
-
     const newSlug = generateSlugFromName(formData.title_jp);
     setFormData(prev => ({ ...prev, slug: newSlug }));
   };
@@ -125,9 +139,22 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       const longDescPayload = longDescText 
         ? [{ type: 'text', content: longDescText }] 
         : [];
-
+      
+      // CRITICAL FIX: Explicitly normalize all Array fields.
+      // This prevents "malformed array literal" errors by ensuring
+      // we never send strings ("") to text[]/int8[] columns.
+      // The sanitizers guarantee return value is string[] or number[] (never string).
+      
       const payload = {
-        ...formData,
+        ...formData, // Spread first to get scalars
+        
+        // --- Explicit Overwrites for Array Fields ---
+        tags: normalizeStringArray(tagInput), 
+        images: normalizeStringArray(formData.images),
+        collection_handles: normalizeStringArray(formData.collection_handles),
+        recommended_product_ids: normalizeNumberArray(formData.recommended_product_ids),
+        
+        // Scalars / JSONB
         long_desc_sections: longDescPayload,
         price: Number(formData.price),
         compare_at_price: formData.compare_at_price ? Number(formData.compare_at_price) : null,
@@ -135,9 +162,13 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
         sort_order: Number(formData.sort_order),
       };
 
+      // Debug check (Optional)
+      // console.log('Submitting Payload:', payload);
+
       await adminUpsertProduct(payload);
       router.push('/admin/products');
     } catch (err: any) {
+      console.error(err);
       alert('保存に失敗しました: ' + err.message);
     } finally {
       setSaving(false);
@@ -145,7 +176,8 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   };
 
   const toggleCollection = (handle: string) => {
-    const current = formData.collection_handles || [];
+    // Helper handles logic, but handleSubmit handles type safety
+    const current = normalizeStringArray(formData.collection_handles);
     if (current.includes(handle)) {
       setFormData({ ...formData, collection_handles: current.filter(h => h !== handle) });
     } else {
@@ -323,7 +355,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
                   key={c.handle}
                   onClick={() => toggleCollection(c.handle)}
                   className={`px-3 py-1.5 rounded text-xs border transition-colors ${
-                    formData.collection_handles?.includes(c.handle)
+                    (formData.collection_handles || []).includes(c.handle)
                       ? 'bg-primary text-white border-primary'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                   }`}
@@ -339,9 +371,10 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
            <input 
              className="input-base" 
              placeholder="例: summer, sale, baby"
-             value={formData.tags || ''} 
-             onChange={e => setFormData({...formData, tags: e.target.value})} 
+             value={tagInput} 
+             onChange={e => setTagInput(e.target.value)} 
            />
+           <p className="text-xs text-gray-400 mt-1">※ カンマ(,)で区切って複数入力できます</p>
         </div>
       </section>
 

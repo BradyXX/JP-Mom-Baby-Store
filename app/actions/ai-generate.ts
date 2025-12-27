@@ -2,6 +2,7 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { createClient } from '@supabase/supabase-js';
+import { Buffer } from "buffer";
 
 // Supabase Admin Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

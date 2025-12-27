@@ -109,7 +109,7 @@ export default function AdminProductsPage() {
     if (selectedIds.size === 0) return;
     setIsDeleting(true);
     try {
-      const ids = Array.from(selectedIds);
+      const ids = Array.from(selectedIds) as number[];
       const res = await deleteProducts(ids);
       if (res.success) {
         setShowDeleteModal(false);
@@ -132,7 +132,7 @@ export default function AdminProductsPage() {
     setMigrationLogs([]);
     setMigrationStats({ total: selectedIds.size, processed: 0, success: 0, failed: 0 });
 
-    const ids = Array.from(selectedIds);
+    const ids = Array.from(selectedIds) as number[];
     
     // Process one by one to avoid timeout and show progress
     for (const id of ids) {
@@ -169,7 +169,7 @@ export default function AdminProductsPage() {
     setAiStats({ total: selectedIds.size, processed: 0, success: 0, failed: 0 });
 
     try {
-      const ids = Array.from(selectedIds);
+      const ids = Array.from(selectedIds) as number[];
       const result = await batchGenerateDescriptions(ids, false); // forceUpdate = false
       
       setAiStats({

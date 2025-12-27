@@ -1,4 +1,5 @@
 'use client';
+import React from 'react';
 import Accordion from '@/components/Accordion';
 import { ShieldCheck, Truck, RefreshCw, Scale } from 'lucide-react';
 

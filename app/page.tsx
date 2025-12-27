@@ -1,4 +1,5 @@
 
+import React from 'react';
 import Link from 'next/link';
 import { getSettings, listProductsByCollection } from "@/lib/supabase/queries";
 import { Product } from '@/lib/supabase/types';

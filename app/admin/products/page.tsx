@@ -3,12 +3,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { adminListProducts, adminBatchUpsertProducts } from '@/lib/supabase/queries';
 import { Product } from '@/lib/supabase/types';
-import { Plus, Edit, FileUp, Loader2, ArrowUpDown, TableProperties, Trash2, Image as ImageIcon, CheckCircle2, AlertTriangle, X, CloudLightning, Sparkles } from 'lucide-react';
+import { Plus, Edit, FileUp, Loader2, ArrowUpDown, TableProperties, Trash2, Image as ImageIcon, CheckCircle2, AlertTriangle, X, CloudLightning } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 import CsvImportModal from '@/components/admin/CsvImportModal';
 import { deleteProducts } from '@/app/actions/admin-products';
 import { migrateProductImages } from '@/app/actions/image-migration';
-import { batchGenerateDescriptions } from '@/app/actions/ai-generate';
 
 // Sorting options
 const SORT_OPTIONS = [
@@ -44,13 +43,6 @@ export default function AdminProductsPage() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationStats, setMigrationStats] = useState({ total: 0, processed: 0, success: 0, failed: 0 });
   const [migrationLogs, setMigrationLogs] = useState<{id: number, title: string, status: 'ok'|'error', msg?: string}[]>([]);
-
-  // --- Batch AI Generation State ---
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [aiStats, setAiStats] = useState({ total: 0, processed: 0, success: 0, failed: 0 });
-  const [aiLogs, setAiLogs] = useState<{id: number, title: string, status: 'ok'|'error'|'skipped', msg?: string}[]>([]);
-
 
   // Load Data
   async function load() {
@@ -109,7 +101,7 @@ export default function AdminProductsPage() {
     if (selectedIds.size === 0) return;
     setIsDeleting(true);
     try {
-      const ids = Array.from(selectedIds) as number[];
+      const ids = Array.from(selectedIds);
       const res = await deleteProducts(ids);
       if (res.success) {
         setShowDeleteModal(false);
@@ -132,7 +124,7 @@ export default function AdminProductsPage() {
     setMigrationLogs([]);
     setMigrationStats({ total: selectedIds.size, processed: 0, success: 0, failed: 0 });
 
-    const ids = Array.from(selectedIds) as number[];
+    const ids = Array.from(selectedIds);
     
     // Process one by one to avoid timeout and show progress
     for (const id of ids) {
@@ -159,32 +151,6 @@ export default function AdminProductsPage() {
 
     setIsMigrating(false);
     await load(); // Refresh data to show new URLs
-  };
-
-  // --- Batch AI Logic ---
-  const handleBatchAi = async () => {
-    if (selectedIds.size === 0) return;
-    setIsGeneratingAi(true);
-    setAiLogs([]);
-    setAiStats({ total: selectedIds.size, processed: 0, success: 0, failed: 0 });
-
-    try {
-      const ids = Array.from(selectedIds) as number[];
-      const result = await batchGenerateDescriptions(ids, false); // forceUpdate = false
-      
-      setAiStats({
-        total: ids.length,
-        processed: result.processed,
-        success: result.success,
-        failed: result.failed
-      });
-      setAiLogs(result.logs);
-    } catch (e: any) {
-      alert('AI生成エラー: ' + e.message);
-    } finally {
-      setIsGeneratingAi(false);
-      await load();
-    }
   };
 
   // Legacy JSON Import
@@ -238,17 +204,10 @@ export default function AdminProductsPage() {
               <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full">{selectedCount}</span>
               <span className="text-sm font-bold text-blue-900">アイテム選択中</span>
            </div>
-           <div className="flex gap-2 flex-wrap">
-              <button 
-                onClick={() => setShowAiModal(true)}
-                className="btn-secondary border-purple-200 text-purple-700 bg-white hover:bg-purple-50 flex items-center gap-2 text-xs"
-              >
-                <Sparkles size={16} />
-                AI説明生成
-              </button>
+           <div className="flex gap-2">
               <button 
                 onClick={() => setShowMigrateModal(true)}
-                className="btn-secondary border-blue-200 text-blue-700 bg-white hover:bg-blue-100 flex items-center gap-2 text-xs"
+                className="btn-secondary border-blue-200 text-blue-700 hover:bg-blue-100 flex items-center gap-2 text-xs"
               >
                 <CloudLightning size={16} />
                 画像一括移行
@@ -315,7 +274,7 @@ export default function AdminProductsPage() {
                 <th className="px-6 py-3 w-20">画像</th>
                 <th className="px-6 py-3">商品名 (JP)</th>
                 <th className="px-6 py-3">カテゴリー</th>
-                <th className="px-6 py-3">説明文</th>
+                <th className="px-6 py-3">価格</th>
                 <th className="px-6 py-3">在庫</th>
                 <th className="px-6 py-3 text-right">操作</th>
               </tr>
@@ -329,7 +288,6 @@ export default function AdminProductsPage() {
                 const isOutOfStock = p.stock_qty === 0;
                 const isInactive = !p.active;
                 const isSelected = selectedIds.has(p.id);
-                const hasDesc = !!p.short_desc_jp;
                 
                 return (
                   <tr key={p.id} className={`group hover:bg-blue-50/30 transition-colors ${isInactive ? 'opacity-60 bg-gray-50' : ''} ${isSelected ? 'bg-blue-50/60' : ''}`}>
@@ -367,14 +325,8 @@ export default function AdminProductsPage() {
                           )}
                        </div>
                     </td>
-                    <td className="px-6 py-3">
-                       {hasDesc ? (
-                          <span className="inline-flex items-center gap-1 text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded">
-                             <CheckCircle2 size={12}/> 済
-                          </span>
-                       ) : (
-                          <span className="text-gray-400 text-xs">-</span>
-                       )}
+                    <td className={`px-6 py-3 font-mono ${p.price === 0 ? 'text-red-500 font-bold' : ''}`}>
+                       ¥{p.price.toLocaleString()}
                     </td>
                     <td className="px-6 py-3">
                        {isOutOfStock ? (
@@ -507,83 +459,6 @@ export default function AdminProductsPage() {
                      {migrationStats.processed === 0 && (
                         <button onClick={handleBatchMigrate} className="btn-primary flex items-center gap-2">
                            <CloudLightning size={16}/> 開始する
-                        </button>
-                     )}
-                   </>
-                ) : (
-                   <button disabled className="btn-secondary opacity-50 cursor-not-allowed flex items-center gap-2">
-                      <Loader2 className="animate-spin" size={16}/> 処理中...
-                   </button>
-                )}
-             </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- Batch AI Modal --- */}
-      {showAiModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !isGeneratingAi && setShowAiModal(false)} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
-             
-             <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                   <Sparkles size={20} className="text-purple-500"/> AI商品説明生成
-                </h3>
-                {!isGeneratingAi && <button onClick={() => setShowAiModal(false)}><X size={20}/></button>}
-             </div>
-
-             <div className="p-6 overflow-y-auto flex-1">
-                {!isGeneratingAi && aiStats.processed === 0 ? (
-                  // Initial State
-                  <div className="space-y-4">
-                     <p className="text-sm text-gray-600">
-                        選択した <strong>{selectedCount}件</strong> の商品について、Gemini AIを使用して説明文（短・長）を自動生成します。
-                     </p>
-                     <div className="bg-purple-50 border border-purple-200 p-3 rounded text-xs text-purple-800 space-y-1">
-                        <p>・既存の説明文がある商品は<span className="font-bold">スキップ</span>されます。</p>
-                        <p>・画像がない商品は生成できません。</p>
-                        <p>・処理時間は1商品あたり数秒かかります。</p>
-                     </div>
-                  </div>
-                ) : (
-                  // Processing/Result State
-                  <div className="space-y-4">
-                     <div className="flex justify-between text-sm font-bold mb-1">
-                        <span>進捗状況</span>
-                        <span>{Math.round((aiStats.processed / aiStats.total) * 100)}%</span>
-                     </div>
-                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div className="bg-purple-500 h-full transition-all duration-300" style={{width: `${(aiStats.processed / aiStats.total) * 100}%`}}></div>
-                     </div>
-                     <div className="flex gap-4 text-xs text-gray-500 justify-center">
-                        <span className="text-green-600 font-bold">成功: {aiStats.success}</span>
-                        <span className="text-red-600 font-bold">失敗: {aiStats.failed}</span>
-                        <span>残り: {aiStats.total - aiStats.processed}</span>
-                     </div>
-                     
-                     {/* Logs */}
-                     <div className="mt-4 bg-gray-900 rounded p-3 h-40 overflow-y-auto font-mono text-xs text-gray-300">
-                        {aiLogs.map((log, i) => (
-                           <div key={i} className={
-                              log.status === 'error' ? 'text-red-400' : 
-                              log.status === 'skipped' ? 'text-yellow-400' : 'text-green-400'
-                           }>
-                              [{i+1}] {log.status.toUpperCase()}: {log.title} {log.msg ? `(${log.msg})` : ''}
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-                )}
-             </div>
-
-             <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
-                {!isGeneratingAi ? (
-                   <>
-                     <button onClick={() => setShowAiModal(false)} className="btn-secondary">閉じる</button>
-                     {aiStats.processed === 0 && (
-                        <button onClick={handleBatchAi} className="btn-primary flex items-center gap-2 bg-purple-600 hover:bg-purple-700 border-purple-600">
-                           <Sparkles size={16}/> 生成開始
                         </button>
                      )}
                    </>

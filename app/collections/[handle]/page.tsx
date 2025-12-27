@@ -1,5 +1,3 @@
-
-import React from 'react';
 import Link from 'next/link';
 import { listProductsByCollection, ProductListOptions } from "@/lib/supabase/queries";
 import ProductCard from "@/components/ProductCard";

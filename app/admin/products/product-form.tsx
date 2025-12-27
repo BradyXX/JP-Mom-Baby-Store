@@ -1,19 +1,18 @@
+
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { adminUpsertProduct, listCollections } from '@/lib/supabase/queries';
 import { Product } from '@/lib/supabase/types';
 import ImageUploader from '@/components/admin/ImageUploader';
-import { Loader2, RefreshCw, Save, CloudLightning, Sparkles, Wand2, FileText } from 'lucide-react';
+import { Loader2, RefreshCw, Save, CloudLightning } from 'lucide-react';
 import { migrateProductImages } from '@/app/actions/image-migration';
-import { generateProductDescription } from '@/app/actions/ai-generate'; // IMPORT AI ACTION
 import { normalizeStringArray, normalizeNumberArray } from '@/lib/utils/arrays';
 
 export default function ProductForm({ initialData }: { initialData?: Partial<Product> }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [migrating, setMigrating] = useState(false);
-  const [generatingAi, setGeneratingAi] = useState(false); // AI State
   const [collections, setCollections] = useState<any[]>([]);
   
   // Local state for Tag Input (String)
@@ -59,6 +58,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       }
       
       // 2. Handle Tags for Display (Array -> Comma String)
+      // 使用 normalizeStringArray 确保哪怕 initialData 给的是脏数据也能正确转为数组再 join
       const safeTags = normalizeStringArray(initialData.tags);
       setTagInput(safeTags.join(', '));
     }
@@ -89,41 +89,6 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
       alert('移行失敗: ' + e.message);
     } finally {
       setMigrating(false);
-    }
-  };
-
-  // --- AI Generation Logic ---
-  const handleAiGenerate = async (mode: 'short' | 'long' | 'both') => {
-    const images = normalizeStringArray(formData.images);
-    if (!formData.title_jp) return alert('商品名を入力してください');
-    if (images.length === 0) return alert('画像を少なくとも1枚追加してください');
-
-    setGeneratingAi(true);
-    try {
-      const res = await generateProductDescription(
-        formData.title_jp,
-        images,
-        {
-          category: normalizeStringArray(formData.collection_handles)[0],
-          tags: normalizeStringArray(tagInput)
-        }
-      );
-
-      if (res.success) {
-        if (mode === 'short' || mode === 'both') {
-          setFormData(prev => ({ ...prev, short_desc_jp: res.short_desc_jp }));
-        }
-        if (mode === 'long' || mode === 'both') {
-          setLongDescText(res.long_desc_text || '');
-        }
-        // alert('AI生成が完了しました'); // Optional: Use toast in real app
-      } else {
-        alert('生成失敗: ' + res.error);
-      }
-    } catch (e: any) {
-      alert('エラー: ' + e.message);
-    } finally {
-      setGeneratingAi(false);
     }
   };
 
@@ -175,6 +140,11 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
         ? [{ type: 'text', content: longDescText }] 
         : [];
       
+      // CRITICAL FIX: Explicitly normalize all Array fields.
+      // This prevents "malformed array literal" errors by ensuring
+      // we never send strings ("") to text[]/int8[] columns.
+      // The sanitizers guarantee return value is string[] or number[] (never string).
+      
       const payload = {
         ...formData, // Spread first to get scalars
         
@@ -192,6 +162,9 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
         sort_order: Number(formData.sort_order),
       };
 
+      // Debug check (Optional)
+      // console.log('Submitting Payload:', payload);
+
       await adminUpsertProduct(payload);
       router.push('/admin/products');
     } catch (err: any) {
@@ -203,6 +176,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
   };
 
   const toggleCollection = (handle: string) => {
+    // Helper handles logic, but handleSubmit handles type safety
     const current = normalizeStringArray(formData.collection_handles);
     if (current.includes(handle)) {
       setFormData({ ...formData, collection_handles: current.filter(h => h !== handle) });
@@ -406,43 +380,7 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
 
       {/* Description */}
       <section className="bg-white p-6 rounded shadow border border-gray-200 space-y-6">
-        <div className="flex justify-between items-center border-b pb-2 mb-4">
-           <h2 className="text-lg font-bold">商品説明</h2>
-           
-           {/* AI Generation Buttons */}
-           <div className="flex gap-1 md:gap-2">
-              <button 
-                type="button"
-                onClick={() => handleAiGenerate('short')}
-                disabled={generatingAi}
-                className="text-xs btn-secondary py-1.5 px-3 flex items-center gap-1"
-                title="短い説明だけ生成"
-              >
-                {generatingAi ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14} />}
-                短
-              </button>
-              <button 
-                type="button"
-                onClick={() => handleAiGenerate('long')}
-                disabled={generatingAi}
-                className="text-xs btn-secondary py-1.5 px-3 flex items-center gap-1"
-                title="詳細説明だけ生成"
-              >
-                {generatingAi ? <Loader2 size={14} className="animate-spin"/> : <FileText size={14} />}
-                長
-              </button>
-              <button 
-                type="button"
-                onClick={() => handleAiGenerate('both')}
-                disabled={generatingAi}
-                className="text-xs btn-primary bg-purple-600 hover:bg-purple-700 border-purple-600 py-1.5 px-3 flex items-center gap-1"
-                title="両方生成"
-              >
-                {generatingAi ? <Loader2 size={14} className="animate-spin"/> : <Wand2 size={14} />}
-                AIでまとめて生成
-              </button>
-           </div>
-        </div>
+        <h2 className="text-lg font-bold border-b pb-2 mb-4">商品説明</h2>
         
         <div>
            <label className="block text-sm font-bold text-gray-700 mb-1">短い説明 (キャッチコピー)</label>

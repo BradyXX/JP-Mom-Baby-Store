@@ -1,5 +1,3 @@
-
-import React from 'react';
 import { notFound } from 'next/navigation';
 import { getProductBySlug, listProductsByIds } from "@/lib/supabase/queries";
 import ProductDetail from "@/components/ProductDetail";

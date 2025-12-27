@@ -32,6 +32,17 @@ export interface AppSettings {
   line_rr_index: number;
 }
 
+// DEFINITION FOR VARIANTS
+export interface ProductVariant {
+  sku: string;
+  options: { [key: string]: string }; // e.g. { "Size": "M", "Color": "Red" }
+  price?: number; // Optional: usually inherited from parent
+  compare_at_price?: number; // Optional
+  stock_qty: number;
+  in_stock: boolean;
+  image?: string; // URL specific to this variant
+}
+
 export interface Product {
   id: number;
   created_at: string;
@@ -48,7 +59,7 @@ export interface Product {
   long_desc_sections: Json; // DB: jsonb
   tags: string[]; // DB: text[]
   collection_handles: string[]; // DB: text[]
-  variants: Json; // DB: jsonb
+  variants: ProductVariant[]; // DB: jsonb (Strictly typed as Array of Variant)
   recommended_product_ids: number[]; // DB: int8[]
   active: boolean;
   sort_order: number;

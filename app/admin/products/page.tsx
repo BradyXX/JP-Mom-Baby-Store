@@ -1,13 +1,14 @@
+
 'use client';
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { adminListProducts, adminBatchUpsertProducts } from '@/lib/supabase/queries';
 import { Product } from '@/lib/supabase/types';
-import { Plus, Edit, FileUp, Loader2, ArrowUpDown, TableProperties, Trash2, Image as ImageIcon, CheckCircle2, AlertTriangle, X, CloudLightning } from 'lucide-react';
+import { Plus, Edit, FileUp, Loader2, ArrowUpDown, TableProperties, Trash2, Image as ImageIcon, CheckCircle2, AlertTriangle, X, CloudLightning, Layers } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 import CsvImportModal from '@/components/admin/CsvImportModal';
 import { deleteProducts } from '@/app/actions/admin-products';
-import { migrateProductImages } from '@/app/actions/image-migration';
+import { migrateProductImages, migrateProductVariantImages } from '@/app/actions/image-migration';
 
 // Sorting options
 const SORT_OPTIONS = [
@@ -41,6 +42,8 @@ export default function AdminProductsPage() {
   
   const [showMigrateModal, setShowMigrateModal] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [migrateTarget, setMigrateTarget] = useState<'main' | 'variant'>('main');
+  
   const [migrationStats, setMigrationStats] = useState({ total: 0, processed: 0, success: 0, failed: 0 });
   const [migrationLogs, setMigrationLogs] = useState<{id: number, title: string, status: 'ok'|'error', msg?: string}[]>([]);
 
@@ -132,8 +135,15 @@ export default function AdminProductsPage() {
       if (!product) continue;
 
       try {
-        // Call existing Server Action for single product
-        const res = await migrateProductImages(product.id, product.slug, product.images);
+        let res;
+        
+        if (migrateTarget === 'main') {
+           res = await migrateProductImages(product.id, product.slug, product.images);
+        } else {
+           // Variant Migration
+           // Note: variants could be JSON or array depending on raw data, types handle it
+           res = await migrateProductVariantImages(product.id, product.slug, product.variants);
+        }
         
         if (res.success) {
            setMigrationStats(prev => ({ ...prev, processed: prev.processed + 1, success: prev.success + 1 }));
@@ -206,11 +216,18 @@ export default function AdminProductsPage() {
            </div>
            <div className="flex gap-2">
               <button 
-                onClick={() => setShowMigrateModal(true)}
+                onClick={() => { setMigrateTarget('main'); setShowMigrateModal(true); }}
                 className="btn-secondary border-blue-200 text-blue-700 hover:bg-blue-100 flex items-center gap-2 text-xs"
               >
-                <CloudLightning size={16} />
-                画像一括移行
+                <ImageIcon size={16} />
+                主画像移行
+              </button>
+              <button 
+                onClick={() => { setMigrateTarget('variant'); setShowMigrateModal(true); }}
+                className="btn-secondary border-purple-200 text-purple-700 hover:bg-purple-100 flex items-center gap-2 text-xs"
+              >
+                <Layers size={16} />
+                変体画像移行
               </button>
               <button 
                 onClick={() => setShowDeleteModal(true)}
@@ -406,7 +423,8 @@ export default function AdminProductsPage() {
              
              <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                   <CloudLightning size={20} className="text-blue-500"/> 画像一括移行
+                   <CloudLightning size={20} className="text-blue-500"/> 
+                   {migrateTarget === 'main' ? '主画像移行' : '変体画像移行'}
                 </h3>
                 {!isMigrating && <button onClick={() => setShowMigrateModal(false)}><X size={20}/></button>}
              </div>
@@ -416,7 +434,9 @@ export default function AdminProductsPage() {
                   // Initial State
                   <div className="space-y-4">
                      <p className="text-sm text-gray-600">
-                        選択した <strong>{selectedCount}件</strong> の商品に含まれる外部画像（他社サーバー等のURL）をダウンロードし、Supabase Storageへ保存します。
+                        選択した <strong>{selectedCount}件</strong> の商品に含まれる
+                        {migrateTarget === 'main' ? 'メイン画像' : '変体(Variant)画像'}
+                        （他社サーバー等のURL）をダウンロードし、Supabase Storageへ保存します。
                      </p>
                      <div className="bg-yellow-50 border border-yellow-200 p-3 rounded text-xs text-yellow-800 space-y-1">
                         <p>・Next.jsの画像最適化エラー(400)を防止します。</p>

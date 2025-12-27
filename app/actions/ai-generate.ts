@@ -116,8 +116,9 @@ export async function generateProductDescription(
     };
 
     // 4. Call Gemini
+    // Switched to 'gemini-3-flash-preview' because 'gemini-2.5-flash-image' does not support responseSchema/MimeType
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3-flash-preview',
       contents: {
         parts: [...imageParts, { text: userPrompt }]
       },

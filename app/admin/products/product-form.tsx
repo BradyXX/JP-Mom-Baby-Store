@@ -146,7 +146,8 @@ export default function ProductForm({ initialData }: { initialData?: Partial<Pro
 
   const handleGenerateSlug = () => {
     if (!formData.title_jp) return alert('先に商品名を入力してください');
-    setFormData(prev => ({ ...prev, slug: generateSlugFromName(formData.title_jp) }));
+    // FIX: Provide empty string fallback to satisfy TypeScript
+    setFormData(prev => ({ ...prev, slug: generateSlugFromName(formData.title_jp || '') }));
   };
 
   const handleGenerateSku = () => {

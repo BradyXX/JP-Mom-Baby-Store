@@ -1,6 +1,7 @@
 
 import { supabase } from './client';
 import { AppSettings, Product, Coupon, Order } from './types';
+import { normalizeStringArray, normalizeNumberArray } from '@/lib/utils/arrays';
 
 export interface ProductListOptions {
   limit?: number;
@@ -82,8 +83,11 @@ export async function adminUpdateSettings(settings: Partial<AppSettings>) {
 
 export async function listProductsByCollection(handle: string, options: ProductListOptions = {}): Promise<Product[]> {
   try {
+    // START QUERY: Base filter for active products
     let query = supabase.from('products').select('*').eq('active', true);
 
+    // FILTER: Collection Handle (Array contains)
+    // Note: This relies on collection_handles being a TEXT[] column in Postgres
     if (handle !== 'all') {
       query = query.contains('collection_handles', [handle]);
     }
@@ -320,6 +324,21 @@ export async function adminGetProduct(id: number) {
 export async function adminUpsertProduct(product: Partial<Product>) {
   const cleanProduct = JSON.parse(JSON.stringify(product));
   
+  // NORMALIZE ARRAYS before sending to Supabase
+  // This ensures even if the frontend sends dirty data, we clean it before DB.
+  if (cleanProduct.images) {
+    cleanProduct.images = normalizeStringArray(cleanProduct.images);
+  }
+  if (cleanProduct.collection_handles) {
+    cleanProduct.collection_handles = normalizeStringArray(cleanProduct.collection_handles);
+  }
+  if (cleanProduct.tags) {
+    cleanProduct.tags = normalizeStringArray(cleanProduct.tags);
+  }
+  if (cleanProduct.recommended_product_ids) {
+    cleanProduct.recommended_product_ids = normalizeNumberArray(cleanProduct.recommended_product_ids);
+  }
+  
   const { data, error } = await supabase
     .from('products')
     .upsert(cleanProduct)
@@ -329,9 +348,19 @@ export async function adminUpsertProduct(product: Partial<Product>) {
 }
 
 export async function adminBatchUpsertProducts(products: Partial<Product>[]) {
+  // Normalize each product in batch
+  const cleanProducts = products.map(p => {
+    const cp = { ...p };
+    if (cp.images) cp.images = normalizeStringArray(cp.images);
+    if (cp.collection_handles) cp.collection_handles = normalizeStringArray(cp.collection_handles);
+    if (cp.tags) cp.tags = normalizeStringArray(cp.tags);
+    if (cp.recommended_product_ids) cp.recommended_product_ids = normalizeNumberArray(cp.recommended_product_ids);
+    return cp;
+  });
+
   const { data, error } = await supabase
     .from('products')
-    .upsert(products, { onConflict: 'slug' });
+    .upsert(cleanProducts, { onConflict: 'slug' });
   if (error) throw error;
   return data;
 }

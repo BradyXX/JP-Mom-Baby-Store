@@ -6,10 +6,10 @@
  * 
  * @example
  * normalizeStringArray(null) -> []
- * normalizeStringArray("") -> []
  * normalizeStringArray("apple") -> ["apple"]
  * normalizeStringArray("apple, banana") -> ["apple", "banana"]
  * normalizeStringArray("['apple', 'banana']") -> ["apple", "banana"] (JSON string)
+ * normalizeStringArray(["a", "", null]) -> ["a"]
  */
 export function normalizeStringArray(input: any): string[] {
   if (input === null || input === undefined) return [];
@@ -17,9 +17,9 @@ export function normalizeStringArray(input: any): string[] {
   // 1. 如果已经是数组
   if (Array.isArray(input)) {
     return input
-      .map(String) // 确保元素是字符串
+      .map(item => (item === null || item === undefined) ? '' : String(item))
       .map(s => s.trim())
-      .filter(s => s.length > 0); // 过滤空值
+      .filter(s => s.length > 0);
   }
 
   // 2. 如果是字符串
@@ -27,13 +27,16 @@ export function normalizeStringArray(input: any): string[] {
     const trimmed = input.trim();
     if (trimmed.length === 0) return [];
 
-    // A. 尝试当作 JSON 解析 (处理脏数据 "['tag1', 'tag2']")
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    // A. 尝试当作 JSON 解析 (处理脏数据 "['tag1', 'tag2']" 或 '["tag1", "tag2"]')
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']'))) {
       try {
-        const parsed = JSON.parse(trimmed);
+        // Replace single quotes with double quotes for JSON.parse if strictly needed, 
+        // but handle carefully to not break content. 
+        // Simple approach: try parse directly first.
+        const parsed = JSON.parse(trimmed.replace(/'/g, '"')); 
         if (Array.isArray(parsed)) {
           return parsed
-            .map(String)
+            .map(item => (item === null || item === undefined) ? '' : String(item))
             .map(s => s.trim())
             .filter(s => s.length > 0);
         }
@@ -57,39 +60,39 @@ export function normalizeStringArray(input: any): string[] {
 /**
  * 强力标准化数字数组
  * 用于 recommended_product_ids 等 int8[] 字段
+ * 
+ * @example
+ * normalizeNumberArray("1, 2, 3") -> [1, 2, 3]
+ * normalizeNumberArray(["1", "abc", 2]) -> [1, 2]
  */
 export function normalizeNumberArray(input: any): number[] {
   if (input === null || input === undefined) return [];
 
-  if (Array.isArray(input)) {
-    return input
-      .map(Number)
-      .filter(n => !isNaN(n) && isFinite(n));
-  }
+  let rawArray: any[] = [];
 
-  if (typeof input === 'string') {
+  if (Array.isArray(input)) {
+    rawArray = input;
+  } else if (typeof input === 'number') {
+    return [input];
+  } else if (typeof input === 'string') {
     const trimmed = input.trim();
     if (trimmed.length === 0) return [];
 
-    // JSON check
     if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
       try {
         const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-           return parsed.map(Number).filter(n => !isNaN(n) && isFinite(n));
-        }
-      } catch {}
+        if (Array.isArray(parsed)) rawArray = parsed;
+      } catch {
+        // Fallback to split
+        rawArray = trimmed.split(/[,\n，]+/);
+      }
+    } else {
+      rawArray = trimmed.split(/[,\n，]+/);
     }
-
-    return trimmed
-      .split(/[,\n，]+/)
-      .map(Number)
-      .filter(n => !isNaN(n) && isFinite(n));
   }
 
-  if (typeof input === 'number') {
-    return [input];
-  }
-
-  return [];
+  // Filter and map to numbers
+  return rawArray
+    .map(n => Number(n))
+    .filter(n => !isNaN(n) && isFinite(n));
 }

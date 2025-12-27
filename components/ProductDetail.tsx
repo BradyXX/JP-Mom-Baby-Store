@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useRef } from 'react';
 import Image from 'next/image';
@@ -193,6 +194,17 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
         <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-relaxed tracking-tight">{product.title_jp}</h1>
         
+        {/* Tags Display (Updated Logic: Show Tags as Pills) */}
+        {product.tags && product.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+             {product.tags.map((tag, i) => (
+                <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
+                   {tag}
+                </span>
+             ))}
+          </div>
+        )}
+
         <div className="flex items-end gap-3 pb-2 border-b border-gray-50">
           <span className="text-3xl font-bold text-red-600 leading-none tracking-tight">¥{product.price.toLocaleString()}</span>
           {product.compare_at_price && (

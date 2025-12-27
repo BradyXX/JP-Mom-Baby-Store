@@ -1,9 +1,13 @@
+
 import Link from 'next/link';
 import { listProductsByCollection, ProductListOptions } from "@/lib/supabase/queries";
 import ProductCard from "@/components/ProductCard";
 import CollectionFilters from "@/components/CollectionFilters";
 import { SHOP_CATEGORIES } from "@/lib/categories";
 import { Product } from '@/lib/supabase/types';
+
+// Force zero cache to ensure freshness, especially after bulk imports
+export const revalidate = 0;
 
 // Use centralized categories for titles, fallback to handle formatter
 const getCollectionTitle = (handle: string) => {

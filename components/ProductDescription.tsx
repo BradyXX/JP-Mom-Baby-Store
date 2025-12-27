@@ -1,9 +1,10 @@
+
 'use client';
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface DescriptionSection {
-  type?: 'text' | 'image' | 'bullets'; // Optional now
+  type?: 'text' | 'image' | 'bullets'; 
   title?: string;
   content?: string;
   url?: string;
@@ -13,7 +14,7 @@ interface DescriptionSection {
 export default function ProductDescription({ sections }: { sections: DescriptionSection[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // RULE: If empty, show placeholder (Do NOT fallback to old description)
+  // RULE: If empty, show placeholder
   if (!Array.isArray(sections) || sections.length === 0) {
      return (
        <div className="py-8 text-center bg-gray-50 rounded-lg border border-gray-100 border-dashed">
@@ -40,6 +41,7 @@ export default function ProductDescription({ sections }: { sections: Description
               )}
 
               {/* Content / Text Type */}
+              {/* Note: In the new admin logic, type is defaulted to 'text', and content holds the body */}
               {(section.content || section.type === 'text') && (
                 <p className="text-gray-700 leading-8 whitespace-pre-wrap text-sm md:text-base">
                   {section.content}
@@ -65,23 +67,25 @@ export default function ProductDescription({ sections }: { sections: Description
       </div>
 
       {/* Fade overlay when collapsed */}
-      {!isExpanded && (
+      {!isExpanded && sections.length > 2 && (
          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none z-10" />
       )}
 
-      {/* Toggle Button */}
-      <div className="mt-6 text-center relative z-20">
-         <button 
-           onClick={() => setIsExpanded(!isExpanded)}
-           className="inline-flex items-center gap-2 px-8 py-3 bg-white border border-gray-300 rounded-full text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm transition-all active:scale-95"
-         >
-            {isExpanded ? (
-               <>閉じる <ChevronUp size={16} /></>
-            ) : (
-               <>もっと見る <ChevronDown size={16} /></>
-            )}
-         </button>
-      </div>
+      {/* Toggle Button (Only show if long enough) */}
+      {sections.length > 2 && (
+        <div className="mt-6 text-center relative z-20">
+           <button 
+             onClick={() => setIsExpanded(!isExpanded)}
+             className="inline-flex items-center gap-2 px-8 py-3 bg-white border border-gray-300 rounded-full text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm transition-all active:scale-95"
+           >
+              {isExpanded ? (
+                 <>閉じる <ChevronUp size={16} /></>
+              ) : (
+                 <>もっと見る <ChevronDown size={16} /></>
+              )}
+           </button>
+        </div>
+      )}
     </div>
   );
 }
